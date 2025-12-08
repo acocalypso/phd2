@@ -106,6 +106,7 @@ public:
     void ShowProfileWizard();
     void ShowProfileWizard(wxCommandEvent& evt);
     bool SetProfile(int profileId, wxString *error);
+    void RefreshProfileList();
     bool ConnectAll(wxString *error);
     bool DisconnectAll(wxString *error);
     void Shutdown(bool forced);

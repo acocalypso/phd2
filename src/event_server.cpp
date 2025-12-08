@@ -828,6 +828,77 @@ static void set_profile(JObj& response, const json_value *params)
     }
 }
 
+static void create_profile(JObj& response, const json_value *params)
+{
+    Params p("name", params);
+    const json_value *name = p.param("name");
+    if (!name || name->type != JSON_STRING)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected profile name param");
+        return;
+    }
+
+    wxString profileName(name->string_value);
+    if (profileName.IsEmpty())
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "profile name cannot be empty");
+        return;
+    }
+
+    bool alreadyExists = pConfig->CreateProfile(profileName);
+    if (alreadyExists)
+    {
+        response << jrpc_error(1, "profile already exists");
+    }
+    else
+    {
+        int id = pConfig->GetProfileId(profileName);
+        
+        // Update the gear dialog's profile list to reflect the new profile
+        if (pFrame && pFrame->pGearDialog)
+        {
+            pFrame->pGearDialog->RefreshProfileList();
+        }
+        
+        response << jrpc_result(id);
+    }
+}
+
+static void delete_profile(JObj& response, const json_value *params)
+{
+    Params p("name", params);
+    const json_value *name = p.param("name");
+    if (!name || name->type != JSON_STRING)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected profile name param");
+        return;
+    }
+
+    wxString profileName(name->string_value);
+    if (profileName.IsEmpty())
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "profile name cannot be empty");
+        return;
+    }
+
+    int id = pConfig->GetProfileId(profileName);
+    if (id <= 0)
+    {
+        response << jrpc_error(1, "profile does not exist");
+        return;
+    }
+
+    pConfig->DeleteProfile(profileName);
+    
+    // Update the gear dialog's profile list to reflect the deletion
+    if (pFrame && pFrame->pGearDialog)
+    {
+        pFrame->pGearDialog->RefreshProfileList();
+    }
+    
+    response << jrpc_result(0);
+}
+
 static void get_connected(JObj& response, const json_value *params)
 {
     response << jrpc_result(all_equipment_connected());
@@ -3526,6 +3597,8 @@ static bool handle_request(JRpcCall& call)
         { "get_profiles", &get_profiles },
         { "get_profile", &get_profile },
         { "set_profile", &set_profile },
+        { "create_profile", &create_profile },
+        { "delete_profile", &delete_profile },
         { "get_connected", &get_connected },
         { "set_connected", &set_connected },
         { "get_calibrated", &get_calibrated },

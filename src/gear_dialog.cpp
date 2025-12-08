@@ -2076,6 +2076,13 @@ bool GearDialog::SetProfile(int profileId, wxString *error)
     return false;
 }
 
+void GearDialog::RefreshProfileList()
+{
+    wxArrayString profiles = pConfig->ProfileNames();
+    m_profiles->Set(profiles);
+    m_profiles->SetStringSelection(pConfig->GetCurrentProfile());
+}
+
 bool GearDialog::ConnectAll(wxString *error)
 {
     if (m_pCamera && m_pCamera->Connected && (!m_pScope || m_pScope->IsConnected()) &&
