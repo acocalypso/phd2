@@ -8,32 +8,18 @@ on:
 
 jobs:
   debian-arm64:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Set up QEMU for arm64
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Build .deb inside Debian trixie arm64 container
+      - name: Install build dependencies (host arm64)
         run: |
           set -euo pipefail
-          docker run --rm --platform linux/arm64 \
-            -v "${PWD}:/workspace" \
-            -w /workspace \
-            debian:trixie \
-            bash -s <<'EOF'
-          set -euo pipefail
-          set -x
-          export DEBIAN_FRONTEND=noninteractive
-
-          apt-get update
-          apt-get install -y --no-install-recommends \
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
             ca-certificates curl git \
             build-essential packaging-dev debhelper devscripts equivs fakeroot \
             cmake ninja-build pkg-config \
@@ -41,16 +27,21 @@ jobs:
             libindi-dev libnova-dev gettext zlib1g-dev libx11-dev \
             libcurl4-gnutls-dev libopencv-dev libeigen3-dev libgtest-dev
 
-          mk-build-deps --install --remove \
+          sudo mk-build-deps --install --remove \
             --tool "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" \
             debian/control
 
+      - name: Build Debian package
+        run: |
+          set -euo pipefail
           export DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)"
           dpkg-buildpackage -b -us -uc -a arm64
 
-          mkdir -p /workspace/artifacts
-          find / -maxdepth 1 -name "*.deb" -exec cp {} /workspace/artifacts/ \;
-          EOF
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          find .. -maxdepth 1 -name "*.deb" -exec cp {} artifacts/ \;
 
       - name: List artifacts (debug)
         run: ls -l artifacts || true
