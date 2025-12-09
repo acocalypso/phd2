@@ -29,6 +29,7 @@ jobs:
             debian:trixie \
             bash -s <<'EOF'
           set -euo pipefail
+          set -x
           export DEBIAN_FRONTEND=noninteractive
 
           apt-get update
@@ -48,7 +49,7 @@ jobs:
           dpkg-buildpackage -b -us -uc -a arm64
 
           mkdir -p /workspace/artifacts
-          find .. -maxdepth 1 -name "*.deb" -exec cp {} /workspace/artifacts/ \;
+          find / -maxdepth 1 -name "*.deb" -exec cp {} /workspace/artifacts/ \;
           EOF
 
       - name: List artifacts (debug)
