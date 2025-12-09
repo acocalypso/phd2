@@ -51,6 +51,9 @@ jobs:
           find .. -maxdepth 1 -name "*.deb" -exec cp {} /workspace/artifacts/ \;
           EOF
 
+      - name: List artifacts (debug)
+        run: ls -l artifacts || true
+
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
