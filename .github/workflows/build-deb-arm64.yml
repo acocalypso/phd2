@@ -32,7 +32,7 @@ jobs:
             libindi-dev libnova-dev gettext zlib1g-dev libx11-dev \
             libcurl4-gnutls-dev libeigen3-dev libgtest-dev libopencv-dev \
             libjpeg-dev libpng-dev libtiff-dev libavcodec-dev libavformat-dev \
-            libswscale-dev libavutil-dev libgtk-3-dev libv4l-dev libdc1394-22-dev
+            libswscale-dev libavutil-dev libgtk-3-dev libv4l-dev libdc1394-dev
 
           sudo mk-build-deps --install --remove \
             --tool "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" \
