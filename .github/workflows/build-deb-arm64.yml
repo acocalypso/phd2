@@ -2,20 +2,6 @@ name: Build Debian arm64 package
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag name for release (leave empty to auto-generate)"
-        required: false
-      release_name:
-        description: "Release title"
-        required: false
-      prerelease:
-        description: "Mark as prerelease"
-        required: false
-        default: "true"
-  push:
-    branches: [ master ]
-  pull_request:
 
 jobs:
   debian-arm64:
@@ -65,30 +51,19 @@ jobs:
       - name: List artifacts (debug)
         run: ls -l artifacts || true
 
-      - name: Compute tag and name (dispatch only)
+      - name: Compute tag and name
         id: tag
-        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            tag="${{ github.event.inputs.tag }}"
-          else
-            ts=$(date -u +%Y%m%d-%H%M%S)
-            tag="auto-${ts}-${GITHUB_SHA::7}"
-          fi
-          if [ -n "${{ github.event.inputs.release_name }}" ]; then
-            relname="${{ github.event.inputs.release_name }}"
-          else
-            relname="$tag"
-          fi
+          version=$(sed -n '1s/^.*(\([^)]*\)).*/\1/p' debian/changelog)
+          ts=$(date -u +%Y%m%d-%H%M%S)
+          tag="v${version}-${ts}"
           echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
-          echo "release_name=$relname" >> "$GITHUB_OUTPUT"
+          echo "release_name=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release (dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           name: ${{ steps.tag.outputs.release_name }}
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           files: artifacts/*.deb
