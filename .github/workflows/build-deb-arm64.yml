@@ -49,8 +49,9 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DBUILD_LIST=core,imgproc,highgui,videoio,imgcodecs \
             -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
-            -DWITH_FFMPEG=ON -DWITH_GSTREAMER=ON
-          cmake --build opencv-${OPENCV_VERSION}/build --parallel
+            -DWITH_FFMPEG=ON -DWITH_GSTREAMER=OFF -DWITH_OPENCL=OFF \
+            -DWITH_IPP=OFF -DWITH_TBB=OFF
+          cmake --build opencv-${OPENCV_VERSION}/build --parallel 3
           sudo cmake --install opencv-${OPENCV_VERSION}/build
           sudo ldconfig
 
