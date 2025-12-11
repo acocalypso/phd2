@@ -42,8 +42,8 @@ jobs:
         run: |
           set -euo pipefail
           OPENCV_VERSION=4.11.0
-          curl -L "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" -o opencv-${OPENCV_VERSION}.tar.gz
-          tar -xf opencv-${OPENCV_VERSION}.tar.gz
+          curl -fL --retry 5 --retry-delay 5 "https://codeload.github.com/opencv/opencv/tar.gz/refs/tags/${OPENCV_VERSION}" -o opencv-${OPENCV_VERSION}.tar.gz
+          tar -xzf opencv-${OPENCV_VERSION}.tar.gz
           cmake -S opencv-${OPENCV_VERSION} -B opencv-${OPENCV_VERSION}/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
