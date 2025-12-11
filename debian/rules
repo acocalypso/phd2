@@ -48,4 +48,4 @@ override_dh_auto_clean:
 # Needed when building with OPENSOURCE_ONLY=0 (bundled binary-only libraries in /usr/lib/phd2/)
 # Harmless when OPENSOURCE_ONLY=1 (directory won't exist)
 override_dh_shlibdeps:
-	dh_shlibdeps -l$(CURDIR)/debian/phd2/usr/lib/phd2
+	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info -l$(CURDIR)/debian/phd2/usr/lib/phd2
