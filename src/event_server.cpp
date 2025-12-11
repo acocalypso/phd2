@@ -899,6 +899,56 @@ static void delete_profile(JObj& response, const json_value *params)
     response << jrpc_result(0);
 }
 
+static void rename_profile(JObj& response, const json_value *params)
+{
+    Params p("name", params);
+    const json_value *new_name = p.param("name");
+    
+    if (!new_name || new_name->type != JSON_STRING)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected name param");
+        return;
+    }
+
+    wxString newName(new_name->string_value);
+    
+    if (newName.IsEmpty())
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "name cannot be empty");
+        return;
+    }
+
+    if (!pConfig)
+    {
+        response << jrpc_error(1, "configuration not available");
+        return;
+    }
+
+    // Get the current profile name
+    wxString oldName = pConfig->GetCurrentProfile();
+    if (oldName.IsEmpty())
+    {
+        response << jrpc_error(1, "no current profile");
+        return;
+    }
+    
+    // RenameProfile handles all validation and returns true on error, false on success
+    bool error = pConfig->RenameProfile(oldName, newName);
+    if (error)
+    {
+        response << jrpc_error(1, "failed to rename profile");
+        return;
+    }
+    
+    // Update the gear dialog's profile list to reflect the rename
+    if (pFrame && pFrame->pGearDialog)
+    {
+        pFrame->pGearDialog->RefreshProfileList();
+    }
+    
+    response << jrpc_result(0);
+}
+
 static void get_connected(JObj& response, const json_value *params)
 {
     response << jrpc_result(all_equipment_connected());
@@ -3599,6 +3649,7 @@ static bool handle_request(JRpcCall& call)
         { "set_profile", &set_profile },
         { "create_profile", &create_profile },
         { "delete_profile", &delete_profile },
+        { "rename_profile", &rename_profile },
         { "get_connected", &get_connected },
         { "set_connected", &set_connected },
         { "get_calibrated", &get_calibrated },
