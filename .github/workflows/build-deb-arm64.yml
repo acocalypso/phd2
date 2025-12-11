@@ -30,15 +30,37 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             wx-common wx3.2-i18n libwxgtk3.2-dev \
             libindi-dev libnova-dev gettext zlib1g-dev libx11-dev \
-            libcurl4-gnutls-dev libopencv-dev libeigen3-dev libgtest-dev
+            libcurl4-gnutls-dev libeigen3-dev libgtest-dev libopencv-dev \
+            libjpeg-dev libpng-dev libtiff-dev libavcodec-dev libavformat-dev \
+            libswscale-dev libavutil-dev libgtk-3-dev libv4l-dev libdc1394-22-dev
 
           sudo mk-build-deps --install --remove \
             --tool "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" \
             debian/control
 
+      - name: Build OpenCV 4.11.0 (host arm64)
+        run: |
+          set -euo pipefail
+          OPENCV_VERSION=4.11.0
+          curl -L "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" -o opencv-${OPENCV_VERSION}.tar.gz
+          tar -xf opencv-${OPENCV_VERSION}.tar.gz
+          cmake -S opencv-${OPENCV_VERSION} -B opencv-${OPENCV_VERSION}/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DBUILD_LIST=core,imgproc,highgui,videoio,imgcodecs \
+            -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
+            -DWITH_FFMPEG=ON -DWITH_GSTREAMER=ON
+          cmake --build opencv-${OPENCV_VERSION}/build --parallel
+          sudo cmake --install opencv-${OPENCV_VERSION}/build
+          sudo ldconfig
+
       - name: Build Debian package
         run: |
           set -euo pipefail
+          export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
+          export CMAKE_PREFIX_PATH="/usr/local:${CMAKE_PREFIX_PATH:-}"
+          export OpenCV_DIR="/usr/local/lib/cmake/opencv4"
           export DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)"
           dpkg-buildpackage -b -us -uc -a arm64
 
