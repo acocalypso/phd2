@@ -2,6 +2,17 @@ name: Build Debian arm64 package
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name for release (leave empty to auto-generate)"
+        required: false
+      release_name:
+        description: "Release title"
+        required: false
+      prerelease:
+        description: "Mark as prerelease"
+        required: false
+        default: "true"
   push:
     branches: [ master ]
   pull_request:
@@ -9,6 +20,8 @@ on:
 jobs:
   debian-arm64:
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,3 +70,42 @@ jobs:
         with:
           name: phd2-debian-arm64
           path: artifacts/*.deb
+
+  release:
+    needs: debian-arm64
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Compute tag and name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          else
+            ts=$(date -u +%Y%m%d-%H%M%S)
+            tag="auto-${ts}-${GITHUB_SHA::7}"
+          fi
+          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+            relname="${{ github.event.inputs.release_name }}"
+          else
+            relname="$tag"
+          fi
+          echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_name=$relname" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: phd2-debian-arm64
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: ${{ steps.tag.outputs.release_name }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: dist/*.deb
