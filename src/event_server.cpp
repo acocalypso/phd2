@@ -2164,6 +2164,99 @@ static void set_camera_use_subframes(JObj& response, const json_value *params)
     response << jrpc_result(enable);
 }
 
+static void get_camera_bitdepth(JObj& response, const json_value *params)
+{
+    if (!pCamera)
+    {
+        response << jrpc_error(1, "Camera not available");
+        return;
+    }
+
+    // Read from camera-specific profile setting (what the camera will use on next connect)
+    int bitdepth = 16; // default
+    wxString camName = pCamera->Name;
+    if (camName.Contains("ToupTek") || camName.Contains("Altair"))
+        bitdepth = pConfig->Profile.GetInt("/camera/ToupTek/bpp", 16);
+    else if (camName.Contains("Ogma"))
+        bitdepth = pConfig->Profile.GetInt("/camera/ogma/bpp", 16);
+    else if (camName.Contains("ZWO"))
+        bitdepth = pConfig->Profile.GetInt("/camera/ZWO/bpp", 16);
+    else if (camName.Contains("PlayerOne"))
+        bitdepth = pConfig->Profile.GetInt("/camera/POA/bpp", 16);
+    else if (camName.Contains("SVB"))
+        bitdepth = pConfig->Profile.GetInt("/camera/svb/bpp", 16);
+    else if (camName.Contains("Moravian"))
+        bitdepth = pConfig->Profile.GetInt("/camera/moravian/bpp", 16);
+    else if (camName.Contains("QHY"))
+        bitdepth = pConfig->Profile.GetInt("/camera/QHY/bpp", 16);
+    else
+        bitdepth = pCamera->BitsPerPixel(); // fallback to actual hardware state
+
+    response << jrpc_result(bitdepth);
+}
+
+static void set_camera_bitdepth(JObj& response, const json_value *params)
+{
+    if (!pCamera)
+    {
+        response << jrpc_error(1, "Camera not available");
+        return;
+    }
+
+    Params p("bitdepth", params);
+    const json_value *val = p.param("bitdepth");
+    int bitdepth;
+    if (!val)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected bitdepth param");
+        return;
+    }
+
+    if (val->type == JSON_INT)
+    {
+        bitdepth = val->int_value;
+    }
+    else if (val->type == JSON_STRING)
+    {
+        bitdepth = wxAtoi(val->string_value);
+    }
+    else
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected bitdepth integer or string param");
+        return;
+    }
+
+    if (bitdepth != 8 && bitdepth != 16)
+    {
+        response << jrpc_error(1, "bitdepth must be 8 or 16");
+        return;
+    }
+
+    // Write to camera-specific profile setting (same as radio button would do)
+    wxString camName = pCamera->Name;
+    if (camName.Contains("ToupTek") || camName.Contains("Altair"))
+        pConfig->Profile.SetInt("/camera/ToupTek/bpp", bitdepth);
+    else if (camName.Contains("Ogma"))
+        pConfig->Profile.SetInt("/camera/ogma/bpp", bitdepth);
+    else if (camName.Contains("ZWO"))
+        pConfig->Profile.SetInt("/camera/ZWO/bpp", bitdepth);
+    else if (camName.Contains("PlayerOne"))
+        pConfig->Profile.SetInt("/camera/POA/bpp", bitdepth);
+    else if (camName.Contains("SVB"))
+        pConfig->Profile.SetInt("/camera/svb/bpp", bitdepth);
+    else if (camName.Contains("Moravian"))
+        pConfig->Profile.SetInt("/camera/moravian/bpp", bitdepth);
+    else if (camName.Contains("QHY"))
+        pConfig->Profile.SetInt("/camera/QHY/bpp", bitdepth);
+    else
+    {
+        response << jrpc_error(1, "Camera does not support bitdepth setting");
+        return;
+    }
+
+    response << jrpc_result(bitdepth);
+}
+
 static void set_camera_binning(JObj& response, const json_value *params)
 {
     if (!pCamera)
@@ -4083,6 +4176,8 @@ static bool handle_request(JRpcCall& call)
         { "set_camera_temperature_setpoint", &set_camera_temperature_setpoint },
         { "get_camera_use_subframes", &get_camera_use_subframes },
         { "set_camera_use_subframes", &set_camera_use_subframes },
+        { "get_camera_bitdepth", &get_camera_bitdepth },
+        { "set_camera_bitdepth", &set_camera_bitdepth },
         { "shutdown", &shutdown },
         { "get_camera_binning", &get_camera_binning },
         { "set_camera_binning", &set_camera_binning },
