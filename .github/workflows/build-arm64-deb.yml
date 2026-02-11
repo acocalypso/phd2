@@ -127,7 +127,7 @@ jobs:
           # Put CI run number in the debian_revision so the .deb filename becomes:
           # phd2_<upstream_version>-<run_number>_arm64.deb
           base_version=$(printf '%s' "$orig_version" | sed -E 's/-[A-Za-z0-9.+~]+$//')
-          new_version="${base_version}-${GITHUB_RUN_NUMBER}"
+          new_version="${base_version}-$((30 + GITHUB_RUN_NUMBER))"
 
           export DEBEMAIL="actions@github.com"
           export DEBFULLNAME="GitHub Actions"
