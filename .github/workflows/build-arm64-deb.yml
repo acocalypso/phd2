@@ -1,0 +1,173 @@
+name: Build Debian arm64 package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debian-arm64:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:trixie
+    permissions:
+      contents: write
+    steps:
+      - name: Bootstrap container tooling
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git curl
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies (Debian Trixie arm64)
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          # Enable deb-src
+          sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources || sed -i '/^deb /p; s/^deb /deb-src /' /etc/apt/sources.list
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git \
+            build-essential debhelper devscripts equivs fakeroot dpkg-dev cdbs \
+            cmake ninja-build pkg-config \
+            autoconf automake libtool \
+            gettext \
+            wx-common wx3.2-i18n libwxgtk3.2-dev \
+            zlib1g-dev libx11-dev libeigen3-dev libgtest-dev libgmock-dev \
+            libcurl4-gnutls-dev \
+            libjpeg-dev libpng-dev libtiff-dev \
+            libavcodec-dev libavformat-dev libswscale-dev libavutil-dev \
+            libgtk-3-dev libv4l-dev libdc1394-dev \
+            libcfitsio-dev libnova-dev libusb-1.0-0-dev \
+            libgsl-dev libfftw3-dev libczmq-dev libftdi1-dev \
+            libavdevice-dev libgps-dev libraw-dev libgphoto2-dev \
+            libboost-all-dev libopencv-dev libzmq3-dev libudev-dev \
+            liblimesuite-dev libhidapi-dev nlohmann-json3-dev \
+            libev-dev \
+            gnupg
+
+          # Debian Trixie currently ships libindi-dev 1.9.x, but PHD2 packaging requires INDI >= 2.0.
+          # Build indi-core from source (v2.1.7) and install a dummy dpkg package (libindi-dev 2.1.7)
+          # so mk-build-deps can satisfy the versioned Build-Depends.
+          mkdir -p "$HOME/Projects" "$HOME/Projects/build"
+          cd "$HOME/Projects"
+          git clone --depth 1 --branch v2.1.7 https://github.com/indilib/indi.git indi-core
+          mkdir -p "$HOME/Projects/build/indi-core"
+          cmake -S "$HOME/Projects/indi-core" -B "$HOME/Projects/build/indi-core" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$HOME/Projects/build/indi-core" --parallel "$(nproc)"
+          cmake --install "$HOME/Projects/build/indi-core"
+          ldconfig
+
+          mkdir -p /tmp/libindi-dev-equivs
+          cat > /tmp/libindi-dev-equivs/control <<'EOF'
+          Section: misc
+          Priority: optional
+          Standards-Version: 4.7.0
+          
+          Package: libindi-dev
+          Version: 2.1.7
+          Maintainer: GitHub Actions <actions@github.com>
+          Architecture: all
+          Description: Dummy libindi-dev package (CI)
+           Dummy package to satisfy Build-Depends when INDI is built from source.
+          EOF
+          (cd /tmp/libindi-dev-equivs && equivs-build control)
+          dpkg -i /tmp/libindi-dev-equivs/libindi-dev_2.1.7_all.deb
+
+          # Ensure we are in the workspace root where debian/control exists
+          cd "${GITHUB_WORKSPACE}"
+          mk-build-deps --install --remove \
+            --tool "apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y" \
+            debian/control
+
+      - name: Build OpenCV 4.11.0 (host arm64)
+        run: |
+          set -euo pipefail
+          OPENCV_VERSION=4.11.0
+          curl -fL --retry 5 --retry-delay 5 "https://codeload.github.com/opencv/opencv/tar.gz/refs/tags/${OPENCV_VERSION}" -o opencv-${OPENCV_VERSION}.tar.gz
+          tar -xzf opencv-${OPENCV_VERSION}.tar.gz
+          cmake -S opencv-${OPENCV_VERSION} -B opencv-${OPENCV_VERSION}/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DBUILD_LIST=core,imgproc,highgui,videoio,imgcodecs \
+            -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF \
+            -DWITH_FFMPEG=ON -DWITH_GSTREAMER=OFF -DWITH_OPENCL=OFF \
+            -DWITH_IPP=OFF -DWITH_TBB=OFF
+          cmake --build opencv-${OPENCV_VERSION}/build --parallel 3
+          cmake --install opencv-${OPENCV_VERSION}/build
+          ldconfig
+
+      - name: Build and install INDI 3rd Party (v2.1.7)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/Projects" "$HOME/Projects/build/indi-3rdparty"
+          cd "$HOME/Projects"
+
+          git clone --depth 1 --branch v2.1.7 https://github.com/indilib/indi-3rdparty.git indi-3rdparty
+
+          cmake -S "$HOME/Projects/indi-3rdparty" -B "$HOME/Projects/build/indi-3rdparty" \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$HOME/Projects/build/indi-3rdparty" --parallel 4
+          cmake --install "$HOME/Projects/build/indi-3rdparty"
+          ldconfig
+
+      - name: Stamp run number into Debian version
+        run: |
+          set -euo pipefail
+
+          orig_version=$(sed -n '1s/^.*(\([^)]*\)).*/\1/p' debian/changelog)
+          # Debian version format: [epoch:]upstream_version[-debian_revision]
+          # Put CI run number in the debian_revision so the .deb filename becomes:
+          # phd2_<upstream_version>-<run_number>_arm64.deb
+          base_version=$(printf '%s' "$orig_version" | sed -E 's/-[A-Za-z0-9.+~]+$//')
+          new_version="${base_version}-${GITHUB_RUN_NUMBER}"
+
+          export DEBEMAIL="actions@github.com"
+          export DEBFULLNAME="GitHub Actions"
+          dch --noauto-nmu -v "$new_version" "CI build ${GITHUB_RUN_NUMBER}"
+
+      - name: Build Debian package
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
+          export CMAKE_PREFIX_PATH="/usr/local:${CMAKE_PREFIX_PATH:-}"
+          export OpenCV_DIR="/usr/local/lib/cmake/opencv4"
+          export DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)"
+          dpkg-buildpackage -b -us -uc -a arm64
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          find .. -maxdepth 1 -name "*.deb" -exec cp {} artifacts/ \;
+
+      - name: List artifacts (debug)
+        run: ls -l artifacts || true
+
+      - name: Compute tag and name
+        id: tag
+        run: |
+          set -euo pipefail
+          version=$(sed -n '1s/^.*(\([^)]*\)).*/\1/p' debian/changelog)
+          # For the release tag/name, keep the existing pattern and add -<run_number>
+          # while avoiding embedding the debian revision (which is the run number).
+          base_version=$(printf '%s' "$version" | sed -E 's/-[0-9]+$//')
+          ts=$(date -u +%Y%m%d-%H%M%S)
+          tag="v${base_version}-${ts}-${GITHUB_RUN_NUMBER}"
+          echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_name=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: ${{ steps.tag.outputs.release_name }}
+          files: artifacts/*.deb
