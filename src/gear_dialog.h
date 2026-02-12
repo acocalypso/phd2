@@ -103,18 +103,24 @@ public:
     void ShowProfileWizard();
     void ShowProfileWizard(wxCommandEvent& evt);
     bool SetProfile(int profileId, wxString *error);
+    void RefreshProfileList();
     bool ConnectAll(wxString *error);
     bool DisconnectAll(wxString *error);
     void Shutdown(bool forced);
     bool IsEmptyProfile();
     bool ReconnectCamera();
+    bool SetSelectedCameraById(const wxString& cameraId);
+    bool SetSelectedCameraByName(const wxString& cameraName);
+    bool SetSelectedMountByName(const wxString& mountName);
+    bool SetSelectedINDIMountDriver(const wxString& driverName);
     Scope *AuxScope() const;
     wxString SelectedCameraId() const;
     static wxString CameraSelectionKey(const wxString& camName);
+    void UpdateGearPointers();
+    void UpdateButtonState();
 
 private:
     void LoadGearChoices();
-    void UpdateGearPointers();
 
     void UpdateCameraButtonState();
     void UpdateScopeButtonState();
@@ -123,7 +129,6 @@ private:
     void UpdateRotatorButtonState();
     void UpdateConnectAllButtonState();
     void UpdateDisconnectAllButtonState();
-    void UpdateButtonState();
     void UpdateAdvancedDialog(bool preLoad);
 
     void OnProfileChoice(wxCommandEvent& event);

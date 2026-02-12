@@ -1249,6 +1249,224 @@ bool GearDialog::ReconnectCamera()
     return err;
 }
 
+bool GearDialog::SetSelectedCameraById(const wxString& cameraId)
+{
+    Debug.Write(wxString::Format("gear_dialog: SetSelectedCameraById %s\n", cameraId));
+    
+    // Find which camera type has this instance ID
+    wxArrayString cameraNames = GuideCamera::GuideCameraList();
+    wxString targetCameraType;
+    
+    for (unsigned int i = 0; i < cameraNames.Count(); i++)
+    {
+        wxString camName = cameraNames[i];
+        GuideCamera *testCam = GuideCamera::Factory(camName);
+        if (testCam)
+        {
+            wxArrayString names, ids;
+            if (!testCam->EnumCameras(names, ids))
+            {
+                // Successfully enumerated - check if our ID is in the list
+                for (unsigned int j = 0; j <ids.Count(); j++)
+                {
+                    if (ids[j] == cameraId)
+                    {
+                        targetCameraType = camName;
+                        delete testCam;
+                        Debug.Write(wxString::Format("gear_dialog: Found camera ID in type: %s\n", camName));
+                        break;
+                    }
+                }
+            }
+            if (!targetCameraType.IsEmpty())
+                break;
+            delete testCam;
+        }
+    }
+    
+    if (targetCameraType.IsEmpty())
+    {
+        Debug.Write("gear_dialog: Camera ID not found in any camera type\n");
+        return true; // error
+    }
+    
+    // Save the instance ID to this camera type's config key
+    wxString key = CameraSelectionKey(targetCameraType);
+    if (pConfig->Profile.GetString(key, wxEmptyString) != cameraId)
+    {
+        pConfig->Profile.SetString(key, cameraId);
+        m_flushConfig = true;
+    }
+    
+    // Switch the gear dialog to this camera type if needed
+    if (targetCameraType != m_lastCamera)
+    {
+        m_lastCamera = targetCameraType;
+        if (pConfig->Profile.GetString("/camera/LastMenuChoice", wxEmptyString) != targetCameraType)
+        {
+            pConfig->Profile.SetString("/camera/LastMenuChoice", targetCameraType);
+            m_flushConfig = true;
+        }
+        
+        // Recreate the camera with the target type
+        delete m_pCamera;
+        m_pCamera = nullptr;
+        UpdateGearPointers();
+        m_pCamera = GuideCamera::Factory(targetCameraType);
+        Debug.Write(wxString::Format("gear_dialog: Created new camera of type %s\n", targetCameraType));
+        m_selectCameraButton->Enable(m_pCamera && m_pCamera->CanSelectCamera());
+        UpdateGearPointers();
+        
+        // Update the gear dialog's camera choice control to reflect the new selection
+        if (m_pCameras)
+        {
+            m_pCameras->SetStringSelection(targetCameraType);
+        }
+    }
+    
+    UpdateButtonState();
+    return false;
+}
+
+bool GearDialog::SetSelectedCameraByName(const wxString& cameraName)
+{
+    Debug.Write(wxString::Format("gear_dialog: SetSelectedCameraByName %s\n", cameraName));
+    
+    // Verify the camera type exists
+    wxArrayString cameras = GuideCamera::GuideCameraList();
+    bool found = false;
+    for (unsigned int i = 0; i < cameras.Count(); i++)
+    {
+        if (cameras[i] == cameraName)
+        {
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found)
+    {
+        Debug.Write(wxString::Format("gear_dialog: Camera type not found: %s\n", cameraName));
+        return true; // error
+    }
+    
+    // Update the last menu choice config
+    if (pConfig->Profile.GetString("/camera/LastMenuChoice", wxEmptyString) != cameraName)
+    {
+        pConfig->Profile.SetString("/camera/LastMenuChoice", cameraName);
+        m_flushConfig = true;
+    }
+    
+    // Switch to this camera type
+    delete m_pCamera;
+    m_pCamera = nullptr;
+    UpdateGearPointers();
+    m_pCamera = GuideCamera::Factory(cameraName);
+    Debug.Write(wxString::Format("gear_dialog: Created new camera of type %s\n", cameraName));
+    m_selectCameraButton->Enable(m_pCamera && m_pCamera->CanSelectCamera());
+    UpdateGearPointers();
+    
+    // Update the gear dialog's camera choice control to reflect the new selection
+    m_lastCamera = cameraName;
+    if (m_pCameras)
+    {
+        m_pCameras->SetStringSelection(cameraName);
+    }
+    
+    UpdateButtonState();
+    
+    return false;
+}
+
+bool GearDialog::SetSelectedMountByName(const wxString& mountName)
+{
+    Debug.Write(wxString::Format("gear_dialog: SetSelectedMountByName %s\n", mountName));
+    
+    // Verify the mount type exists
+    wxArrayString mounts = Scope::MountList();
+    bool found = false;
+    for (unsigned int i = 0; i < mounts.Count(); i++)
+    {
+        if (mounts[i] == mountName)
+        {
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found)
+    {
+        Debug.Write(wxString::Format("gear_dialog: Mount type not found: %s\n", mountName));
+        return true; // error
+    }
+    
+    // Update the last menu choice config
+    if (pConfig->Profile.GetString("/scope/LastMenuChoice", wxEmptyString) != mountName)
+    {
+        pConfig->Profile.SetString("/scope/LastMenuChoice", mountName);
+        m_flushConfig = true;
+    }
+    
+    // Switch to this mount type
+    delete m_pScope;
+    m_pScope = nullptr;
+    UpdateGearPointers();
+    m_pScope = Scope::Factory(mountName);
+    Debug.Write(wxString::Format("gear_dialog: Created new mount of type %s\n", mountName));
+    UpdateGearPointers();
+    
+    // Update the gear dialog's mount choice control to reflect the new selection
+    if (m_pScopes)
+    {
+        m_pScopes->SetStringSelection(mountName);
+    }
+    
+    m_ascomScopeSelected = mountName.Contains("ASCOM");
+    UpdateButtonState();
+    m_mountUpdated = true;
+    
+    return false;
+}
+
+bool GearDialog::SetSelectedINDIMountDriver(const wxString& driverName)
+{
+    Debug.Write(wxString::Format("gear_dialog: SetSelectedINDIMountDriver %s\n", driverName));
+
+    // Update the config with the new INDI driver
+    wxString currentDriver = pConfig->Profile.GetString("/indi/INDImount", wxEmptyString);
+    if (currentDriver != driverName)
+    {
+        pConfig->Profile.SetString("/indi/INDImount", driverName);
+        m_flushConfig = true;
+    }
+    
+    // If the current mount is INDI, recreate it with the new driver config
+    if (m_pScope && m_pScope->Name().Contains(_("INDI")))
+    {
+        Debug.Write(wxString::Format("gear_dialog: Recreating INDI mount with driver: %s\n", driverName));
+        delete m_pScope;
+        m_pScope = nullptr;
+        UpdateGearPointers();
+        m_pScope = Scope::Factory(_("INDI Mount"));
+        UpdateGearPointers();
+    }
+    
+    // Reload the mount list to pick up the new INDI mount name with the updated driver
+    LoadMounts(m_pScopes);
+    Debug.Write(wxString::Format("gear_dialog: Reloaded mount list with new INDI driver: %s\n", driverName));
+    
+    // Construct the expected INDI mount display name with the new driver
+    wxString newINDIMountName = driverName.empty() ? _("INDI Mount") : wxString::Format(_("INDI Mount [%s]"), driverName);
+    
+    // Find and select the new INDI mount name in the refreshed list
+    SetMatchingSelection(m_pScopes, newINDIMountName);
+    Debug.Write(wxString::Format("gear_dialog: Selected new INDI mount name: %s\n", newINDIMountName));
+    
+    UpdateButtonState();
+
+    return false;
+}
+
 void GearDialog::OnButtonDisconnectCamera(wxCommandEvent& event)
 {
     Debug.Write("gear_dialog: OnButtonDisconnectCamera\n");
@@ -1956,6 +2174,13 @@ bool GearDialog::SetProfile(int profileId, wxString *error)
     EndModal(0);
 
     return false;
+}
+
+void GearDialog::RefreshProfileList()
+{
+    wxArrayString profiles = pConfig->ProfileNames();
+    m_profiles->Set(profiles);
+    m_profiles->SetStringSelection(pConfig->GetCurrentProfile());
 }
 
 bool GearDialog::ConnectAll(wxString *error)
