@@ -942,7 +942,11 @@ static void get_all_camera_ids(JObj& response, const json_value *params)
         {
             JAry ary;
             for (unsigned int j = 0; j < ids.Count(); j++)
-                ary << (wxString("\"") + json_escape(ids[j]) + wxString("\""));
+            {
+                JObj camObj;
+                camObj << NV("id", ids[j]) << NV("name", names[j]);
+                ary << camObj;
+            }
             obj << NV(cameraTypes[i], ary);
         }
         
