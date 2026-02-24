@@ -155,8 +155,9 @@ jobs:
       - name: Verify service file path inside .deb
         run: |
           set -euo pipefail
-          deb_file=$(find artifacts -maxdepth 1 -name "*.deb" | head -n 1)
+          deb_file=$(find artifacts -maxdepth 1 -name "phd2_*.deb" ! -name "*dbgsym*" | head -n 1)
           [ -n "${deb_file}" ]
+          echo "Inspecting package: ${deb_file}"
           dpkg-deb -c "${deb_file}" | tee /tmp/deb-contents.txt
           grep -q "./etc/systemd/system/phd2.service" /tmp/deb-contents.txt
 
