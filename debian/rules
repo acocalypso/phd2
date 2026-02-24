@@ -37,3 +37,12 @@ override_dh_auto_configure:
 # Harmless when OPENSOURCE_ONLY=1 (directory won't exist)
 override_dh_shlibdeps:
 	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info -l$(CURDIR)/debian/phd2/usr/lib/phd2
+
+override_dh_installsystemd:
+	dh_installsystemd
+	mkdir -p debian/phd2/etc/systemd/system
+	mv debian/phd2/lib/systemd/system/phd2.service debian/phd2/etc/systemd/system/phd2.service
+	rmdir debian/phd2/lib/systemd/system || true
+	rmdir debian/phd2/lib/systemd || true
+	rmdir debian/phd2/lib || true
+
