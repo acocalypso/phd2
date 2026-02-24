@@ -1,1 +1,1 @@
-debian/phd2.service.template usr/share/phd2/
+debian/phd2.service etc/systemd/system/
