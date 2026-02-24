@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure|triggered)
+        install -d -m 0755 /etc/systemd/system
+        install -m 0644 /usr/share/phd2/phd2.service.template /etc/systemd/system/phd2.service
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

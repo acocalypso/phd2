@@ -39,15 +39,6 @@ override_dh_shlibdeps:
 	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info -l$(CURDIR)/debian/phd2/usr/lib/phd2
 
 override_dh_installsystemd:
-	dh_installsystemd
-	mkdir -p debian/phd2/etc/systemd/system
-	# Handle both /lib and /usr/lib locations
-	if [ -f debian/phd2/lib/systemd/system/phd2.service ]; then \
-		mv debian/phd2/lib/systemd/system/phd2.service debian/phd2/etc/systemd/system/phd2.service; \
-		rmdir -p --ignore-fail-on-non-empty debian/phd2/lib/systemd/system; \
-	elif [ -f debian/phd2/usr/lib/systemd/system/phd2.service ]; then \
-		mv debian/phd2/usr/lib/systemd/system/phd2.service debian/phd2/etc/systemd/system/phd2.service; \
-		rmdir -p --ignore-fail-on-non-empty debian/phd2/usr/lib/systemd/system; \
-	fi
+	true
 
 

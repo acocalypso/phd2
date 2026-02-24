@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        rm -f /etc/systemd/system/phd2.service
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload >/dev/null 2>&1 || true
+        fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0
