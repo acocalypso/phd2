@@ -1,0 +1,22 @@
+[Unit]
+Description=PHD2 Guiding
+After=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=HOME=/home/pi
+
+ExecStartPre=/bin/rm -f /home/pi/phd2.1
+ExecStart=/usr/bin/phd2
+WorkingDirectory=/home/pi
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target
