@@ -2903,6 +2903,26 @@ static void get_star_image(JObj& response, const json_value *params)
     response << jrpc_result(rslt);
 }
 
+static void get_secondary_stars(JObj& response, const json_value *params)
+{
+    VERIFY_GUIDER(response);
+
+    JAry ary;
+    GuiderMultiStar *pMS = dynamic_cast<GuiderMultiStar *>(pFrame->pGuider);
+    if (pMS)
+    {
+        const std::vector<GuideStar>& stars = pMS->GetGuideStars();
+        for (size_t i = 1; i < stars.size(); i++)
+        {
+            JObj star;
+            star << NV("x", stars[i].X, 2) << NV("y", stars[i].Y, 2);
+            ary << star;
+        }
+    }
+
+    response << jrpc_result(ary);
+}
+
 static bool parse_settle(SettleParams *settle, const json_value *j, wxString *error)
 {
     bool found_pixels = false, found_time = false, found_timeout = false;
@@ -4145,6 +4165,7 @@ static bool handle_request(JRpcCall& call)
         { "set_lock_shift_params", &set_lock_shift_params },
         { "save_image", &save_image },
         { "get_star_image", &get_star_image },
+        { "get_secondary_stars", &get_secondary_stars },
         { "get_use_subframes", &get_use_subframes },
         { "get_search_region", &get_search_region },
         { "set_search_region", &set_search_region },
