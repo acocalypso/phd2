@@ -134,6 +134,7 @@ public:
     wxString GetStarCount() const override;
     void SetMultiStarMode(bool val) override;
     void ClearSecondaryStars();
+    const std::vector<GuideStar>& GetGuideStars() const;
     wxString GetSettingsSummary() const override;
 
     Guider::GuiderConfigDialogPane *GetConfigDialogPane(wxWindow *pParent) override;
@@ -179,6 +180,11 @@ inline bool GuiderMultiStar::IsLocked() const
 inline const PHD_Point& GuiderMultiStar::CurrentPosition() const
 {
     return m_primaryStar;
+}
+
+inline const std::vector<GuideStar>& GuiderMultiStar::GetGuideStars() const
+{
+    return m_guideStars;
 }
 
 #endif /* GUIDER_MULTISTAR_H_INCLUDED */
