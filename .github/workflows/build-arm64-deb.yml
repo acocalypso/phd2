@@ -51,11 +51,11 @@ jobs:
             gnupg
 
           # Debian Trixie currently ships libindi-dev 1.9.x, but PHD2 packaging requires INDI >= 2.0.
-          # Build indi-core from source (v2.1.7) and install a dummy dpkg package (libindi-dev 2.1.7)
+          # Build indi-core from source (v2.1.9) and install a dummy dpkg package (libindi-dev 2.1.9)
           # so mk-build-deps can satisfy the versioned Build-Depends.
           mkdir -p "$HOME/Projects" "$HOME/Projects/build"
           cd "$HOME/Projects"
-          git clone --depth 1 --branch v2.1.7 https://github.com/indilib/indi.git indi-core
+          git clone --depth 1 --branch v2.1.9 https://github.com/indilib/indi.git indi-core
           mkdir -p "$HOME/Projects/build/indi-core"
           cmake -S "$HOME/Projects/indi-core" -B "$HOME/Projects/build/indi-core" \
             -DCMAKE_INSTALL_PREFIX=/usr \
@@ -71,14 +71,14 @@ jobs:
           Standards-Version: 4.7.0
           
           Package: libindi-dev
-          Version: 2.1.7
+          Version: 2.1.9
           Maintainer: GitHub Actions <actions@github.com>
           Architecture: all
           Description: Dummy libindi-dev package (CI)
            Dummy package to satisfy Build-Depends when INDI is built from source.
           EOF
           (cd /tmp/libindi-dev-equivs && equivs-build control)
-          dpkg -i /tmp/libindi-dev-equivs/libindi-dev_2.1.7_all.deb
+          dpkg -i /tmp/libindi-dev-equivs/libindi-dev_2.1.9_all.deb
 
           # Ensure we are in the workspace root where debian/control exists
           cd "${GITHUB_WORKSPACE}"
@@ -103,13 +103,13 @@ jobs:
           cmake --install opencv-${OPENCV_VERSION}/build
           ldconfig
 
-      - name: Build and install INDI 3rd Party (v2.1.7)
+      - name: Build and install INDI 3rd Party (v2.1.9)
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Projects" "$HOME/Projects/build/indi-3rdparty"
           cd "$HOME/Projects"
 
-          git clone --depth 1 --branch v2.1.7 https://github.com/indilib/indi-3rdparty.git indi-3rdparty
+          git clone --depth 1 --branch v2.1.9 https://github.com/indilib/indi-3rdparty.git indi-3rdparty
 
           cmake -S "$HOME/Projects/indi-3rdparty" -B "$HOME/Projects/build/indi-3rdparty" \
             -DCMAKE_INSTALL_PREFIX=/usr \
