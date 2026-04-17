@@ -561,9 +561,7 @@ bool Camera_QHY::EnumCameras(wxArrayString& names, wxArrayString& ids)
             uint32_t ret = IsQHYCCDControlAvailable(h, CONTROL_ST4PORT);
             if (ret == QHYCCD_SUCCESS)
                 st4 = true;
-            // CloseQHYCCD(h); // CloseQHYCCD() would proform a reset, so the other software that use QHY camera would be
-            // impacted.
-            //  Do not call this,would not cause memory leak.The SDk has already process this.
+            CloseQHYCCD(h);
         }
         Debug.Write(wxString::Format("QHY cam [%d] %s avail %s st4 %s\n", i, camid, h ? "Yes" : "No", st4 ? "Yes" : "No"));
         if (st4)
