@@ -562,14 +562,17 @@ bool Camera_QHY::EnumCameras(wxArrayString& names, wxArrayString& ids)
             if (ret == QHYCCD_SUCCESS)
                 st4 = true;
             CloseQHYCCD(h);
+            Debug.Write(wxString::Format("QHY cam [%d] %s avail Yes st4 %s\n", i, camid, st4 ? "Yes" : "No"));
         }
-        Debug.Write(wxString::Format("QHY cam [%d] %s avail %s st4 %s\n", i, camid, h ? "Yes" : "No", st4 ? "Yes" : "No"));
-        if (st4)
+        else
         {
-            names.Add(wxString::Format("%d: %s", n, camid));
-            ids.Add(camid);
-            ++n;
+            Debug.Write(wxString::Format("QHY cam [%d] %s avail No (in use?)\n", i, camid));
         }
+        // Always list the camera — it was found by ScanQHYCCD; OpenQHYCCD may
+        // fail simply because PHD2 already holds the handle (camera connected).
+        names.Add(wxString::Format("%d: %s", n, camid));
+        ids.Add(camid);
+        ++n;
     }
 
     return false;
