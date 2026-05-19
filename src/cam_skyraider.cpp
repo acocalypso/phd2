@@ -69,6 +69,7 @@ struct SkyraiderCamera : public GuideCamera
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
 
     void FrameReady();
     bool StopCapture();
@@ -349,6 +350,14 @@ bool SkyraiderCamera::GetDevicePixelSize(double *devPixelSize)
 int SkyraiderCamera::GetDefaultCameraGain()
 {
     return m_defaultGainPct;
+}
+
+bool SkyraiderCamera::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(GuideCameraGain);
+    return true;
 }
 
 GuideCamera *SkyraiderCameraFactory::MakeSkyraiderCamera()

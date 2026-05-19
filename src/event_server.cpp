@@ -3522,6 +3522,43 @@ static void get_camera_frame_size(JObj& response, const json_value *params)
         response << jrpc_error(1, "camera not connected");
 }
 
+static void get_camera_info(JObj& response, const json_value *params)
+{
+    if (!pCamera)
+    {
+        response << jrpc_error(1, "Camera not available");
+        return;
+    }
+
+    JObj info;
+    info << NV("name", pCamera->Name)
+         << NV("connected", pCamera->Connected)
+         << NV("pixel_size", pCamera->GetCameraPixelSize())
+         << NV("is_color", pCamera->HasBayer)
+         << NV("has_gain_control", pCamera->HasGainControl)
+         << NV("gain_pct", pCamera->GuideCameraGain);
+
+    {
+        int hw_gain;
+        if (pCamera->GetHardwareGain(&hw_gain))
+            info << NV("gain", hw_gain);
+    }
+
+    info << NV("has_subframes", pCamera->HasSubframes)
+         << NV("has_cooler", pCamera->HasCooler)
+         << NV("max_hw_binning", (int)pCamera->MaxHwBinning)
+         << NV("binning", (int)pCamera->HwBinning);
+
+    if (pCamera->Connected)
+    {
+        info << NV("bits_per_pixel", (int)pCamera->BitsPerPixel())
+             << NV("frame_width", pCamera->FrameSize.GetWidth())
+             << NV("frame_height", pCamera->FrameSize.GetHeight());
+    }
+
+    response << jrpc_result(info);
+}
+
 static void get_guide_output_enabled(JObj& response, const json_value *params)
 {
     if (pMount)
@@ -3709,6 +3746,50 @@ static void set_dec_guide_mode(JObj& response, const json_value *params)
     if (pFrame->pGraphLog)
         pFrame->pGraphLog->UpdateControls();
 
+    response << jrpc_result(0);
+}
+
+static void get_max_ra_duration(JObj& response, const json_value *params)
+{
+    Scope *scope = TheScope();
+    int duration = scope ? scope->GetMaxRaDuration() : 0;
+    response << jrpc_result(duration);
+}
+
+static void set_max_ra_duration(JObj& response, const json_value *params)
+{
+    Params p("duration", params);
+    const json_value *val = p.param("duration");
+    if (!val || val->type != JSON_INT)
+    {
+        response << jrpc_error(1, "expected duration param");
+        return;
+    }
+    Scope *scope = TheScope();
+    if (scope)
+        scope->SetMaxRaDuration((int)val->int_value);
+    response << jrpc_result(0);
+}
+
+static void get_max_dec_duration(JObj& response, const json_value *params)
+{
+    Scope *scope = TheScope();
+    int duration = scope ? scope->GetMaxDecDuration() : 0;
+    response << jrpc_result(duration);
+}
+
+static void set_max_dec_duration(JObj& response, const json_value *params)
+{
+    Params p("duration", params);
+    const json_value *val = p.param("duration");
+    if (!val || val->type != JSON_INT)
+    {
+        response << jrpc_error(1, "expected duration param");
+        return;
+    }
+    Scope *scope = TheScope();
+    if (scope)
+        scope->SetMaxDecDuration((int)val->int_value);
     response << jrpc_result(0);
 }
 
@@ -4227,6 +4308,7 @@ static bool handle_request(JRpcCall& call)
         { "get_guide_algorithm_dec", &get_guide_algorithm_dec },
         { "set_guide_algorithm_dec", &set_guide_algorithm_dec },
         { "get_camera_frame_size", &get_camera_frame_size },
+        { "get_camera_info", &get_camera_info },
         { "get_current_equipment", &get_current_equipment },
         { "get_available_mounts", &get_available_mounts },
         { "get_available_aux_mounts", &get_available_aux_mounts },
@@ -4252,6 +4334,10 @@ static bool handle_request(JRpcCall& call)
         { "set_algo_param", &set_algo_param },
         { "get_dec_guide_mode", &get_dec_guide_mode },
         { "set_dec_guide_mode", &set_dec_guide_mode },
+        { "get_max_ra_duration", &get_max_ra_duration },
+        { "set_max_ra_duration", &set_max_ra_duration },
+        { "get_max_dec_duration", &get_max_dec_duration },
+        { "set_max_dec_duration", &set_max_dec_duration },
         { "get_settling", &get_settling },
         { "guide_pulse", &guide_pulse },
         { "get_calibration_data", &get_calibration_data },

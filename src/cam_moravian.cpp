@@ -356,6 +356,7 @@ public:
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool SetCoolerSetpoint(double temperature) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
@@ -755,6 +756,14 @@ bool MoravianCamera::GetDevicePixelSize(double *devPixelSize)
 int MoravianCamera::GetDefaultCameraGain()
 {
     return m_defaultGainPct;
+}
+
+bool MoravianCamera::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(0, m_maxGain, GuideCameraGain);
+    return true;
 }
 
 bool MoravianCamera::SetCoolerOn(bool on)

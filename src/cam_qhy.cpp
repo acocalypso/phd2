@@ -119,6 +119,7 @@ public:
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
     bool GetSensorTemperature(double *temperature) override;
@@ -496,6 +497,22 @@ int Camera_QHY::GetDefaultCameraGain()
 
     Debug.Write(wxString::Format("QHY: default gain: %d\n", gain));
     return gain;
+}
+
+bool Camera_QHY::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    if (Connected)
+    {
+        *gain = (int) GetQHYCCDParam(m_camhandle, CONTROL_GAIN);
+        return true;
+    }
+    double g = m_gainMin + GuideCameraGain * (m_gainMax - m_gainMin) / 100.0;
+    if (g != 0)
+        g = floor(g / m_gainStep) * m_gainStep;
+    *gain = (int) g;
+    return true;
 }
 
 bool Camera_QHY::SetCoolerOn(bool on)

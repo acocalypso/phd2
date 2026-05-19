@@ -719,6 +719,11 @@ int GuideCamera::GetDefaultCameraGain()
     return DefaultGuideCameraGain;
 }
 
+bool GuideCamera::GetHardwareGain(int *gain) const
+{
+    return false;
+}
+
 bool GuideCamera::SetBinning(int binning)
 {
     auto hwSwBin = GetHwAndSwBinning(binning);
