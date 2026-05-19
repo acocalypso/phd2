@@ -45,6 +45,7 @@
 #include "Refine_DefMap.h"
 
 #include <algorithm>
+#include <atomic>
 #include <memory>
 
 #include <wx/filesys.h>
@@ -76,6 +77,7 @@ wxDEFINE_EVENT(SET_STATUS_TEXT_EVENT, wxThreadEvent);
 wxDEFINE_EVENT(ALERT_FROM_THREAD_EVENT, wxThreadEvent);
 wxDEFINE_EVENT(RECONNECT_CAMERA_EVENT, wxThreadEvent);
 wxDEFINE_EVENT(UPDATER_EVENT, wxThreadEvent);
+wxDEFINE_EVENT(BUILD_DARK_LIBRARY_EVENT, wxCommandEvent);
 
 // clang-format off
 // clang-format off
@@ -165,6 +167,7 @@ EVT_THREAD(MYFRAME_WORKER_THREAD_MOVE_COMPLETE, MyFrame::OnMoveComplete)
 
 EVT_COMMAND(wxID_ANY, REQUEST_EXPOSURE_EVENT, MyFrame::OnRequestExposure)
 EVT_COMMAND(wxID_ANY, WXMESSAGEBOX_PROXY_EVENT, MyFrame::OnMessageBoxProxy)
+EVT_COMMAND(wxID_ANY, BUILD_DARK_LIBRARY_EVENT, MyFrame::OnBuildDarkLibrary)
 
 EVT_THREAD(SET_STATUS_TEXT_EVENT, MyFrame::OnStatusMsg)
 EVT_THREAD(ALERT_FROM_THREAD_EVENT, MyFrame::OnAlertFromThread)
@@ -2744,6 +2747,158 @@ void MyFrame::DeleteDarkLibraryFiles(int profileId)
 
     DefectMap::DeleteDefectMap(profileId);
 }
+
+// ---- RPC-driven dark library build ----------------------------------------
+
+struct BuildDarkLibraryRequest
+{
+    std::vector<int> expTimes; // ms, sorted ascending
+    int frameCount;
+};
+
+static std::atomic<bool> s_darkBuildActive(false);
+static std::atomic<bool> s_cancelDarkBuild(false);
+
+void MyFrame::StartBuildDarkLibrary(const std::vector<int>& expTimes, int frameCount)
+{
+    BuildDarkLibraryRequest *req = new BuildDarkLibraryRequest();
+    req->expTimes = expTimes;
+    req->frameCount = frameCount;
+
+    wxCommandEvent evt(BUILD_DARK_LIBRARY_EVENT);
+    evt.SetClientData(req);
+    wxPostEvent(this, evt);
+}
+
+void MyFrame::CancelBuildDarkLibrary()
+{
+    s_cancelDarkBuild.store(true);
+}
+
+void MyFrame::OnBuildDarkLibrary(wxCommandEvent& evt)
+{
+    BuildDarkLibraryRequest *req = static_cast<BuildDarkLibraryRequest *>(evt.GetClientData());
+    std::vector<int> expTimes = req->expTimes;
+    int frameCount = req->frameCount;
+    delete req;
+
+    if (s_darkBuildActive.load())
+    {
+        Debug.Write("OnBuildDarkLibrary: build already in progress, ignoring\n");
+        EvtServer.NotifyDarkBuildComplete(false, "already in progress");
+        return;
+    }
+
+    if (!pCamera || !pCamera->Connected)
+    {
+        EvtServer.NotifyDarkBuildComplete(false, "camera not connected");
+        return;
+    }
+
+    s_darkBuildActive.store(true);
+    s_cancelDarkBuild.store(false);
+
+    if (pCamera->HasShutter)
+        pCamera->ShutterClosed = true;
+
+    pCamera->ClearDarks();
+
+    int totalFrames = (int)expTimes.size() * frameCount;
+    int framesCompleted = 0;
+    bool err = false;
+    wxString errMsg;
+
+    for (int expMs : expTimes)
+    {
+        if (s_cancelDarkBuild.load())
+            break;
+
+        usImage *dark = new usImage();
+        dark->ImgExpDur = expMs;
+        dark->ImgStackCnt = frameCount;
+
+        unsigned int *avgimg = nullptr;
+
+        for (int j = 1; j <= frameCount; j++)
+        {
+            wxYield();
+            if (s_cancelDarkBuild.load())
+                break;
+
+            CaptureParams cp;
+            cp.duration = expMs;
+            cp.hwBinning = pCamera->HwBinning;
+            cp.swBinning = 1;
+            cp.bpp = pCamera->BitsPerPixel();
+            cp.gain = pCamera->GuideCameraGain;
+            cp.captureOptions = CAPTURE_DARK;
+
+            err = GuideCamera::Capture(pCamera, *dark, cp);
+            if (err)
+            {
+                errMsg = wxString::Format("capture failed at exp=%d frame=%d/%d", expMs, j, frameCount);
+                Debug.Write(errMsg + "\n");
+                break;
+            }
+
+            dark->CalcStats();
+
+            if (!avgimg)
+            {
+                avgimg = new unsigned int[dark->NPixels];
+                memset(avgimg, 0, dark->NPixels * sizeof(*avgimg));
+            }
+            const unsigned short *src = dark->ImageData;
+            unsigned int *dst = avgimg;
+            for (unsigned int i = 0; i < dark->NPixels; i++)
+                *dst++ += *src++;
+
+            ++framesCompleted;
+            EvtServer.NotifyDarkBuildProgress(framesCompleted, totalFrames, expMs);
+            wxYield();
+        }
+
+        if (avgimg && !err && !s_cancelDarkBuild.load())
+        {
+            unsigned short *dst = dark->ImageData;
+            const unsigned int *src = avgimg;
+            for (unsigned int i = 0; i < dark->NPixels; i++)
+                *dst++ = (unsigned short)(*src++ / frameCount);
+            delete[] avgimg;
+            pCamera->AddDark(dark);
+        }
+        else
+        {
+            delete[] avgimg;
+            delete dark;
+            if (err)
+                break;
+        }
+    }
+
+    if (pCamera->HasShutter)
+        pCamera->ShutterClosed = false;
+
+    bool cancelled = s_cancelDarkBuild.load();
+    s_cancelDarkBuild.store(false);
+    s_darkBuildActive.store(false);
+
+    if (!err && !cancelled)
+    {
+        SaveDarkLibrary(wxEmptyString);
+        LoadDarkHandler(true);
+        EvtServer.NotifyDarkBuildComplete(true, wxEmptyString);
+    }
+    else
+    {
+        pCamera->ClearDarks();
+        if (DarkLibExists(pConfig->GetCurrentProfileId(), false))
+            LoadDarkHandler(true);
+        EvtServer.NotifyDarkBuildComplete(false, cancelled ? "cancelled" : errMsg);
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 bool MyFrame::SetServerMode(bool serverMode)
 {

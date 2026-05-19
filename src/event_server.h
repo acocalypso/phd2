@@ -84,6 +84,8 @@ public:
     void NotifyGuidingParam(const wxString& name, bool val);
     void NotifyGuidingParam(const wxString& name, const wxString& val);
     void NotifyConfigurationChange();
+    void NotifyDarkBuildProgress(int framesCompleted, int totalFrames, int exposureMs);
+    void NotifyDarkBuildComplete(bool success, const wxString& errorMsg);
 
 private:
     void OnEventServerEvent(wxSocketEvent& evt);

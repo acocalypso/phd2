@@ -3793,6 +3793,123 @@ static void set_max_dec_duration(JObj& response, const json_value *params)
     response << jrpc_result(0);
 }
 
+static void get_dark_library_info(JObj& response, const json_value *params)
+{
+    int numDarks = 0;
+    double minExp = 0.0, maxExp = 0.0;
+    bool loaded = false;
+    bool exists = false;
+
+    if (pCamera)
+    {
+        loaded = pCamera->CurrentDarkFrame != nullptr;
+        exists = pFrame->DarkLibExists(pConfig->GetCurrentProfileId(), false);
+        if (loaded)
+            pCamera->GetDarkLibraryProperties(&numDarks, &minExp, &maxExp);
+    }
+
+    JObj rslt;
+    rslt << NV("exists", exists);
+    rslt << NV("loaded", loaded);
+    rslt << NV("numDarks", numDarks);
+    rslt << NV("minExposureSec", minExp);
+    rslt << NV("maxExposureSec", maxExp);
+    response << jrpc_result(rslt);
+}
+
+static void load_dark_library(JObj& response, const json_value *params)
+{
+    if (!pCamera || !pCamera->Connected)
+    {
+        response << jrpc_error(1, "camera not connected");
+        return;
+    }
+    bool ok = pFrame->LoadDarkHandler(true);
+    if (!ok)
+        response << jrpc_error(1, "failed to load dark library");
+    else
+        response << jrpc_result(0);
+}
+
+static void unload_dark_library(JObj& response, const json_value *params)
+{
+    if (pCamera && pCamera->CurrentDarkFrame)
+        pFrame->LoadDarkHandler(false);
+    response << jrpc_result(0);
+}
+
+static void delete_dark_library(JObj& response, const json_value *params)
+{
+    if (pCamera && pCamera->CurrentDarkFrame)
+        pCamera->ClearDarks();
+    wxString filename = MyFrame::DarkLibFileName(pConfig->GetCurrentProfileId());
+    if (wxFileExists(filename))
+        wxRemoveFile(filename);
+    response << jrpc_result(0);
+}
+
+static void start_build_dark_library(JObj& response, const json_value *params)
+{
+    if (!pCamera || !pCamera->Connected)
+    {
+        response << jrpc_error(1, "camera not connected");
+        return;
+    }
+    if (pFrame->CaptureActive)
+    {
+        response << jrpc_error(1, "capture already active");
+        return;
+    }
+
+    Params p("expTimes", "frameCount", params);
+
+    const json_value *jExpTimes = p.param("expTimes");
+    if (!jExpTimes || jExpTimes->type != JSON_ARRAY)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected expTimes array");
+        return;
+    }
+
+    std::vector<int> expTimes;
+    for (const json_value *v = jExpTimes->first_child; v; v = v->next_sibling)
+    {
+        if (v->type != JSON_INT || v->int_value < 1)
+        {
+            response << jrpc_error(JSONRPC_INVALID_PARAMS, "expTimes must be positive integers (ms)");
+            return;
+        }
+        expTimes.push_back((int)v->int_value);
+    }
+
+    if (expTimes.empty())
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expTimes must not be empty");
+        return;
+    }
+
+    int frameCount = 5;
+    const json_value *jCount = p.param("frameCount");
+    if (jCount)
+    {
+        if (jCount->type != JSON_INT || jCount->int_value < 1)
+        {
+            response << jrpc_error(JSONRPC_INVALID_PARAMS, "frameCount must be a positive integer");
+            return;
+        }
+        frameCount = (int)jCount->int_value;
+    }
+
+    std::sort(expTimes.begin(), expTimes.end());
+    pFrame->StartBuildDarkLibrary(expTimes, frameCount);
+    response << jrpc_result(0);
+}
+
+static void cancel_build_dark_library(JObj& response, const json_value *params)
+{
+    pFrame->CancelBuildDarkLibrary();
+    response << jrpc_result(0);
+}
+
 static void get_settling(JObj& response, const json_value *params)
 {
     bool settling = PhdController::IsSettling();
@@ -4338,6 +4455,12 @@ static bool handle_request(JRpcCall& call)
         { "set_max_ra_duration", &set_max_ra_duration },
         { "get_max_dec_duration", &get_max_dec_duration },
         { "set_max_dec_duration", &set_max_dec_duration },
+        { "get_dark_library_info", &get_dark_library_info },
+        { "load_dark_library", &load_dark_library },
+        { "unload_dark_library", &unload_dark_library },
+        { "delete_dark_library", &delete_dark_library },
+        { "start_build_dark_library", &start_build_dark_library },
+        { "cancel_build_dark_library", &cancel_build_dark_library },
         { "get_settling", &get_settling },
         { "guide_pulse", &guide_pulse },
         { "get_calibration_data", &get_calibration_data },
@@ -4939,4 +5062,26 @@ void EventServer::NotifyConfigurationChange()
     Ev ev("ConfigurationChange");
     do_notify(m_eventServerClients, ev);
     m_configEventDebouncer->StartOnce(0);
+}
+
+void EventServer::NotifyDarkBuildProgress(int framesCompleted, int totalFrames, int exposureMs)
+{
+    if (m_eventServerClients.empty())
+        return;
+    Ev ev("DarkLibraryBuildProgress");
+    ev << NV("Frame", framesCompleted);
+    ev << NV("TotalFrames", totalFrames);
+    ev << NV("ExposureMs", exposureMs);
+    do_notify(m_eventServerClients, ev);
+}
+
+void EventServer::NotifyDarkBuildComplete(bool success, const wxString& errorMsg)
+{
+    if (m_eventServerClients.empty())
+        return;
+    Ev ev("DarkLibraryBuildComplete");
+    ev << NV("Success", success);
+    if (!success && !errorMsg.empty())
+        ev << NV("Error", errorMsg);
+    do_notify(m_eventServerClients, ev);
 }
