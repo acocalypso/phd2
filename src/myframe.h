@@ -56,6 +56,7 @@ wxDECLARE_EVENT(STATUSBAR_ENQUEUE_EVENT, wxCommandEvent);
 wxDECLARE_EVENT(STATUSBAR_TIMER_EVENT, wxTimerEvent);
 wxDECLARE_EVENT(SET_STATUS_TEXT_EVENT, wxThreadEvent);
 wxDECLARE_EVENT(ALERT_FROM_THREAD_EVENT, wxThreadEvent);
+wxDECLARE_EVENT(BUILD_DARK_LIBRARY_EVENT, wxCommandEvent);
 
 enum NOISE_REDUCTION_METHOD
 {
@@ -396,6 +397,8 @@ public:
     bool LoadDarkHandler(bool checkIt); // Use to also set menu item states
     void LoadDefectMapHandler(bool checkIt);
     void CheckDarkFrameGeometry();
+    void StartBuildDarkLibrary(const std::vector<int>& expTimes, int frameCount);
+    void CancelBuildDarkLibrary();
     void UpdateStatusBarCalibrationStatus();
     void UpdateStatusBarStateLabels();
     void UpdateStatusBarStarInfo(double SNR, bool Saturated);
@@ -411,6 +414,7 @@ public:
 
     void OnRequestExposure(wxCommandEvent& evt);
     void OnRequestMountMove(wxCommandEvent& evt);
+    void OnBuildDarkLibrary(wxCommandEvent& evt);
 
     void ScheduleExposure();
 
