@@ -91,6 +91,7 @@ public:
     bool GetDevicePixelSize(double *devPixelSize) override;
     wxSize DarkFrameSize() override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool SetCoolerSetpoint(double temperature) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
@@ -620,6 +621,14 @@ wxSize Camera_ZWO::DarkFrameSize()
 int Camera_ZWO::GetDefaultCameraGain()
 {
     return m_defaultGainPct;
+}
+
+bool Camera_ZWO::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(m_minGain, m_maxGain, GuideCameraGain);
+    return true;
 }
 
 bool Camera_ZWO::SetCoolerOn(bool on)

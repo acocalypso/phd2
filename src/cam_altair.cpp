@@ -161,6 +161,7 @@ struct AltairCamera : public GuideCamera
     bool ST4HasNonGuiMove() override { return true; }
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
+    bool GetHardwareGain(int *gain) const override;
 
     void StopCapture();
 };
@@ -252,6 +253,14 @@ wxByte AltairCamera::BitsPerPixel()
 inline static int cam_gain(int minval, int maxval, int pct)
 {
     return minval + pct * (maxval - minval) / 100;
+}
+
+bool AltairCamera::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(m_minGain, m_maxGain, GuideCameraGain);
+    return true;
 }
 
 inline static int gain_pct(int minval, int maxval, int val)

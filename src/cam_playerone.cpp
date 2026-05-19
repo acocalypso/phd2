@@ -89,6 +89,7 @@ public:
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool SetCoolerSetpoint(double temperature) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
@@ -609,6 +610,14 @@ bool PlayerOneCamera::GetDevicePixelSize(double *devPixelSize)
 int PlayerOneCamera::GetDefaultCameraGain()
 {
     return m_defaultGainPct;
+}
+
+bool PlayerOneCamera::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(m_minGain, m_maxGain, GuideCameraGain);
+    return true;
 }
 
 bool PlayerOneCamera::SetCoolerOn(bool on)

@@ -82,6 +82,7 @@ public:
     wxByte BitsPerPixel() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
 
 private:
     void StopCapture();
@@ -551,6 +552,14 @@ bool SVBCamera::GetDevicePixelSize(double *devPixelSize)
 int SVBCamera::GetDefaultCameraGain()
 {
     return m_defaultGainPct;
+}
+
+bool SVBCamera::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = cam_gain(m_minGain, m_maxGain, GuideCameraGain);
+    return true;
 }
 
 inline static int round_down(int v, int m)

@@ -260,6 +260,7 @@ public:
     void ShowPropertyDialog() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool SetCoolerSetpoint(double temperature) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
@@ -850,6 +851,14 @@ bool CameraToupTek::GetDevicePixelSize(double *devPixelSize)
 int CameraToupTek::GetDefaultCameraGain()
 {
     return m_cam.m_defaultGainPct;
+}
+
+bool CameraToupTek::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = m_cam.cam_gain(GuideCameraGain);
+    return true;
 }
 
 bool CameraToupTek::SetCoolerOn(bool on)

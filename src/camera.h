@@ -259,6 +259,9 @@ public:
     int GetCameraGain() const;
     bool SetCameraGain(int cameraGain);
     virtual int GetDefaultCameraGain();
+    // Returns the hardware gain value in camera-specific units (e.g. dB or ADU counts).
+    // Returns false if the camera does not support reporting hardware gain.
+    virtual bool GetHardwareGain(int *gain) const;
 
     virtual bool Capture(usImage& img, const CaptureParams& captureParams) = 0;
 

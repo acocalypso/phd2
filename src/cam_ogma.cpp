@@ -259,6 +259,7 @@ public:
     void ShowPropertyDialog() override;
     bool GetDevicePixelSize(double *devPixelSize) override;
     int GetDefaultCameraGain() override;
+    bool GetHardwareGain(int *gain) const override;
     bool SetCoolerOn(bool on) override;
     bool SetCoolerSetpoint(double temperature) override;
     bool GetCoolerStatus(bool *on, double *setpoint, double *power, double *temperature) override;
@@ -842,6 +843,14 @@ bool CameraOgma::GetDevicePixelSize(double *devPixelSize)
 int CameraOgma::GetDefaultCameraGain()
 {
     return m_cam.m_defaultGainPct;
+}
+
+bool CameraOgma::GetHardwareGain(int *gain) const
+{
+    if (!HasGainControl)
+        return false;
+    *gain = m_cam.cam_gain(GuideCameraGain);
+    return true;
 }
 
 bool CameraOgma::SetCoolerOn(bool on)
