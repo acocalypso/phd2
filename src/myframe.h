@@ -180,14 +180,9 @@ public:
 class MyFrame : public wxFrame
 {
 protected:
-    NOISE_REDUCTION_METHOD GetNoiseReductionMethod() const;
-    bool SetNoiseReductionMethod(int noiseReductionMethod);
-
     bool GetServerMode() const;
     bool SetServerMode(bool val);
 
-    bool SetTimeLapse(int timeLapse);
-    int GetTimeLapse() const;
     int GetExposureDelay();
 
     friend class MyFrameConfigDialogPane;
@@ -217,6 +212,11 @@ private:
 public:
     MyFrame();
     virtual ~MyFrame();
+
+    NOISE_REDUCTION_METHOD GetNoiseReductionMethod() const;
+    bool SetNoiseReductionMethod(int noiseReductionMethod);
+    bool SetTimeLapse(int timeLapse);
+    int GetTimeLapse() const;
 
     Guider *pGuider;
     wxMenuBar *Menubar;
