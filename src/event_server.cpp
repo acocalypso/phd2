@@ -3360,6 +3360,30 @@ static void set_saturation_adu_value(JObj& response, const json_value *params)
     response << jrpc_result(aduValue);
 }
 
+// Noise reduction method: 0=None, 1=2x2 Mean, 2=3x3 Median
+static void get_noise_reduction_method(JObj& response, const json_value *params)
+{
+    response << jrpc_result((int)pFrame->GetNoiseReductionMethod());
+}
+
+static void set_noise_reduction_method(JObj& response, const json_value *params)
+{
+    Params p("method", params);
+    const json_value *val = p.param("method");
+    if (!val || val->type != JSON_INT)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected integer method param (0=None, 1=2x2Mean, 2=3x3Median)");
+        return;
+    }
+    int method = val->int_value;
+    if (!pFrame->SetNoiseReductionMethod(method))
+    {
+        response << jrpc_error(1, "invalid noise reduction method value");
+        return;
+    }
+    response << jrpc_result(0);
+}
+
 static void get_guide_algorithm_ra(JObj& response, const json_value *params)
 {
     if (!pMount)
@@ -3946,6 +3970,30 @@ static void set_variable_delay_settings(JObj& response, const json_value *params
     response << jrpc_result(0);
 }
 
+// Time lapse: fixed delay in milliseconds between guide exposures.
+// Mutually exclusive with variable delay — when variable delay is enabled, time lapse has no effect.
+static void get_time_lapse(JObj& response, const json_value *params)
+{
+    response << jrpc_result(pFrame->GetTimeLapse());
+}
+
+static void set_time_lapse(JObj& response, const json_value *params)
+{
+    Params p("ms", params);
+    const json_value *val = p.param("ms");
+    if (!val || val->type != JSON_INT)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected integer ms param");
+        return;
+    }
+    if (!pFrame->SetTimeLapse(val->int_value))
+    {
+        response << jrpc_error(1, "invalid time lapse value");
+        return;
+    }
+    response << jrpc_result(0);
+}
+
 static void get_limit_frame(JObj& response, const json_value *params)
 {
     JObj rslt;
@@ -4420,6 +4468,8 @@ static bool handle_request(JRpcCall& call)
         { "get_saturation_adu_value", &get_saturation_adu_value },
         { "set_saturation_by_adu", &set_saturation_by_adu },
         { "set_saturation_adu_value", &set_saturation_adu_value },
+        { "get_noise_reduction_method", &get_noise_reduction_method },
+        { "set_noise_reduction_method", &set_noise_reduction_method },
         { "get_guide_algorithm_ra", &get_guide_algorithm_ra },
         { "set_guide_algorithm_ra", &set_guide_algorithm_ra },
         { "get_guide_algorithm_dec", &get_guide_algorithm_dec },
@@ -4471,6 +4521,8 @@ static bool handle_request(JRpcCall& call)
         { "export_config_settings", &export_config_settings },
         { "get_variable_delay_settings", &get_variable_delay_settings },
         { "set_variable_delay_settings", &set_variable_delay_settings },
+        { "get_time_lapse", &get_time_lapse },
+        { "set_time_lapse", &set_time_lapse },
         { "get_limit_frame", &get_limit_frame },
         { "set_limit_frame", &set_limit_frame },
     };
