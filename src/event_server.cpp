@@ -1561,6 +1561,44 @@ static void set_calibration_step(JObj& response, const json_value *params)
     }
 }
 
+static void get_calibration_distance(JObj& response, const json_value *params)
+{
+    Scope *scope = TheScope();
+    if (scope)
+        response << jrpc_result(scope->GetCalibrationDistance());
+    else
+        response << jrpc_error(1, "scope not available");
+}
+
+static void set_calibration_distance(JObj& response, const json_value *params)
+{
+    Params p("calibration_distance", params);
+    const json_value *dist = p.param("calibration_distance");
+
+    if (!dist || dist->type != JSON_INT)
+    {
+        response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected calibration_distance param");
+        return;
+    }
+
+    Scope *scope = TheScope();
+    if (!scope)
+    {
+        response << jrpc_error(1, "scope not available");
+        return;
+    }
+
+    bool ok = !scope->SetCalibrationDistance(dist->int_value);
+    if (ok)
+    {
+        response << jrpc_result(0);
+    }
+    else
+    {
+        response << jrpc_error(1, "could not set calibration distance");
+    }
+}
+
 static void get_auto_restore_calibration(JObj& response, const json_value *params)
 {
     response << jrpc_result(pFrame->GetAutoLoadCalibration());
@@ -3376,12 +3414,11 @@ static void set_noise_reduction_method(JObj& response, const json_value *params)
         return;
     }
     int method = val->int_value;
-    if (!pFrame->SetNoiseReductionMethod(method))
-    {
+    bool ok = !pFrame->SetNoiseReductionMethod(method);
+    if (ok)
+        response << jrpc_result(0);
+    else
         response << jrpc_error(1, "invalid noise reduction method value");
-        return;
-    }
-    response << jrpc_result(0);
 }
 
 static void get_guide_algorithm_ra(JObj& response, const json_value *params)
@@ -3986,12 +4023,11 @@ static void set_time_lapse(JObj& response, const json_value *params)
         response << jrpc_error(JSONRPC_INVALID_PARAMS, "expected integer ms param");
         return;
     }
-    if (!pFrame->SetTimeLapse(val->int_value))
-    {
+    bool ok = !pFrame->SetTimeLapse(val->int_value);
+    if (ok)
+        response << jrpc_result(0);
+    else
         response << jrpc_error(1, "invalid time lapse value");
-        return;
-    }
-    response << jrpc_result(0);
 }
 
 static void get_limit_frame(JObj& response, const json_value *params)
@@ -4396,6 +4432,8 @@ static bool handle_request(JRpcCall& call)
         { "set_focal_length", &set_focal_length },
         { "get_calibration_step", &get_calibration_step },
         { "set_calibration_step", &set_calibration_step },
+        { "get_calibration_distance", &get_calibration_distance },
+        { "set_calibration_distance", &set_calibration_distance },
         { "get_auto_restore_calibration", &get_auto_restore_calibration },
         { "set_auto_restore_calibration", &set_auto_restore_calibration },
         { "get_assume_dec_orthogonal", &get_assume_dec_orthogonal },
