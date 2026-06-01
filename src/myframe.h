@@ -180,7 +180,6 @@ public:
 class MyFrame : public wxFrame
 {
 protected:
-    bool GetServerMode() const;
     bool SetServerMode(bool val);
 
     int GetExposureDelay();
@@ -379,6 +378,7 @@ public:
     bool SetRawImageMode(bool force);
 
     bool StartServer(bool state);
+    bool GetServerMode() const;
     bool FlipCalibrationData();
     int RequestedExposureDuration();
     int GetFocalLength() const;

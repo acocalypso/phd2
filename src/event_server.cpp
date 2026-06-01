@@ -1822,7 +1822,7 @@ static void set_mass_change_threshold(JObj& response, const json_value *params)
         return;
     }
 
-    if (pGuiderMultiStar->SetMassChangeThreshold(tolerance))
+    if (!pGuiderMultiStar->SetMassChangeThreshold(tolerance))
     {
         response << jrpc_result(tolerance);
     }
@@ -2837,7 +2837,7 @@ static void set_search_region(JObj& response, const json_value *params)
 
     pixels = val->int_value;
     GuiderMultiStar *multiStar = dynamic_cast<GuiderMultiStar *>(pFrame->pGuider);
-    if (!multiStar || !multiStar->SetSearchRegion(pixels))
+    if (!multiStar || multiStar->SetSearchRegion(pixels))
     {
         response << jrpc_error(1, "Invalid search region or guider is not multi-star");
         return;
@@ -3282,7 +3282,7 @@ static void set_dither_ra_only(JObj& response, const json_value *params)
     }
 
     raOnly = val->int_value != 0;
-    if (pFrame->SetDitherRaOnly(raOnly))
+    if (!pFrame->SetDitherRaOnly(raOnly))
     {
         response << jrpc_result(raOnly);
     }
@@ -3308,7 +3308,7 @@ static void set_dither_scale(JObj& response, const json_value *params)
         return;
     }
 
-    if (pFrame->SetDitherScaleFactor(scale))
+    if (!pFrame->SetDitherScaleFactor(scale))
     {
         response << jrpc_result(scale);
     }
