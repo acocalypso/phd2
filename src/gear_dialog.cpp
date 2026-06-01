@@ -1142,7 +1142,21 @@ bool GearDialog::DoConnectCamera(bool autoReconnecting)
                     wxString msg = _("By changing cameras in this profile, you won't be able to use the existing dark library "
                                      "or bad-pixel maps. You should consider"
                                      " creating a new profile for this set-up.  Do you want to connect to this camera anyway?");
-                    if (wxMessageBox(msg, _("Camera Change Warning"), wxYES_NO, this) == wxYES)
+                    bool accepted;
+                    if (pFrame->GetServerMode())
+                    {
+                        // In server/headless mode there is no one to dismiss the dialog;
+                        // notify event server clients directly so TNS receives the warning,
+                        // then auto-accept so the connection proceeds.
+                        Debug.Write("DoConnectCamera: server mode - auto-accepting camera-change warning\n");
+                        EvtServer.NotifyAlert(msg, wxICON_WARNING);
+                        accepted = true;
+                    }
+                    else
+                    {
+                        accepted = wxMessageBox(msg, _("Camera Change Warning"), wxYES_NO, this) == wxYES;
+                    }
+                    if (accepted)
                     {
                         m_camWarningIssued = true;
                         m_lastCamera = newCam; // make consistent with what's in the UI
@@ -1640,7 +1654,10 @@ void GearDialog::OnButtonConnectScope(wxCommandEvent& event)
             if (m_pScope && m_ascomScopeSelected && !m_pScope->CanPulseGuide())
             {
                 m_pScope->Disconnect();
-                wxMessageBox(wxString::Format(_("Mount does not support the required PulseGuide interface"), _("Error")));
+                if (!pFrame->GetServerMode())
+                    wxMessageBox(wxString::Format(_("Mount does not support the required PulseGuide interface"), _("Error")));
+                else
+                    Debug.Write("OnButtonConnectScope: mount does not support PulseGuide\n");
                 throw THROW_INFO("OnButtonConnectScope: PulseGuide commands not supported");
             }
 
