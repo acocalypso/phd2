@@ -33,6 +33,7 @@
  */
 
 #include "phd.h"
+#include "backlash_comp.h"
 
 #include <wx/sstream.h>
 #include <wx/sckstrm.h>
@@ -4030,6 +4031,58 @@ static void set_time_lapse(JObj& response, const json_value *params)
         response << jrpc_error(1, "invalid time lapse value");
 }
 
+// Backlash compensation
+static void get_backlash_comp(JObj& response, const json_value *params)
+{
+    Scope *scope = TheScope();
+    if (!scope)
+    {
+        response << jrpc_error(1, "no mount");
+        return;
+    }
+    BacklashComp *blc = scope->GetBacklashComp();
+    int pulseWidth = 0, floor = 0, ceiling = 0;
+    blc->GetBacklashCompSettings(&pulseWidth, &floor, &ceiling);
+    JObj rslt;
+    rslt << NV("enabled", blc->IsEnabled())
+         << NV("pulseWidth", pulseWidth)
+         << NV("floor", floor)
+         << NV("ceiling", ceiling);
+    response << jrpc_result(rslt);
+}
+
+static void set_backlash_comp(JObj& response, const json_value *params)
+{
+    Scope *scope = TheScope();
+    if (!scope)
+    {
+        response << jrpc_error(1, "no mount");
+        return;
+    }
+    Params p("enabled", "pulseWidth", "floor", "ceiling", params);
+    const json_value *jEnabled  = p.param("enabled");
+    const json_value *jPulse    = p.param("pulseWidth");
+    const json_value *jFloor    = p.param("floor");
+    const json_value *jCeiling  = p.param("ceiling");
+
+    BacklashComp *blc = scope->GetBacklashComp();
+
+    if (jEnabled && jEnabled->type == JSON_BOOL)
+        blc->EnableBacklashComp(jEnabled->int_value != 0);
+
+    if (jPulse || jFloor || jCeiling)
+    {
+        int curPulse = 0, curFloor = 0, curCeiling = 0;
+        blc->GetBacklashCompSettings(&curPulse, &curFloor, &curCeiling);
+        int newPulse   = (jPulse   && jPulse->type   == JSON_INT) ? jPulse->int_value   : curPulse;
+        int newFloor   = (jFloor   && jFloor->type   == JSON_INT) ? jFloor->int_value   : curFloor;
+        int newCeiling = (jCeiling && jCeiling->type == JSON_INT) ? jCeiling->int_value : curCeiling;
+        blc->SetBacklashPulseWidth(newPulse, newFloor, newCeiling);
+    }
+
+    response << jrpc_result(0);
+}
+
 static void get_limit_frame(JObj& response, const json_value *params)
 {
     JObj rslt;
@@ -4561,6 +4614,8 @@ static bool handle_request(JRpcCall& call)
         { "set_variable_delay_settings", &set_variable_delay_settings },
         { "get_time_lapse", &get_time_lapse },
         { "set_time_lapse", &set_time_lapse },
+        { "get_backlash_comp", &get_backlash_comp },
+        { "set_backlash_comp", &set_backlash_comp },
         { "get_limit_frame", &get_limit_frame },
         { "set_limit_frame", &set_limit_frame },
     };
