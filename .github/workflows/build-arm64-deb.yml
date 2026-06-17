@@ -54,15 +54,18 @@ jobs:
           # Build indi-core from source (v2.2.3.1) and install a dummy dpkg package (libindi-dev 2.2.3.1)
           # so mk-build-deps can satisfy the versioned Build-Depends.
           INDI_VERSION=2.2.3.1
+          INDI_WARN_FLAGS="-Wno-error -Wno-error=stringop-truncation -Wno-error=stringop-overread"
           mkdir -p "$HOME/Projects" "$HOME/Projects/build"
           cd "$HOME/Projects"
           git clone --depth 1 --branch "v${INDI_VERSION}" https://github.com/indilib/indi.git indi-core
           mkdir -p "$HOME/Projects/build/indi-core"
-          export CFLAGS="${CFLAGS:-} -Wno-error"
-          export CXXFLAGS="${CXXFLAGS:-} -Wno-error"
+          export CFLAGS="${CFLAGS:-} ${INDI_WARN_FLAGS}"
+          export CXXFLAGS="${CXXFLAGS:-} ${INDI_WARN_FLAGS}"
           cmake -S "$HOME/Projects/indi-core" -B "$HOME/Projects/build/indi-core" \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="${INDI_WARN_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${INDI_WARN_FLAGS}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=OFF
           cmake --build "$HOME/Projects/build/indi-core" --parallel "$(nproc)"
           cmake --install "$HOME/Projects/build/indi-core"
@@ -111,16 +114,19 @@ jobs:
         run: |
           set -euo pipefail
           INDI_VERSION=2.2.3.1
+          INDI_WARN_FLAGS="-Wno-error -Wno-error=stringop-truncation -Wno-error=stringop-overread"
           mkdir -p "$HOME/Projects" "$HOME/Projects/build/indi-3rdparty"
           cd "$HOME/Projects"
 
           git clone --depth 1 --branch "v${INDI_VERSION}" https://github.com/indilib/indi-3rdparty.git indi-3rdparty
 
-          export CFLAGS="${CFLAGS:-} -Wno-error"
-          export CXXFLAGS="${CXXFLAGS:-} -Wno-error"
+          export CFLAGS="${CFLAGS:-} ${INDI_WARN_FLAGS}"
+          export CXXFLAGS="${CXXFLAGS:-} ${INDI_WARN_FLAGS}"
           cmake -S "$HOME/Projects/indi-3rdparty" -B "$HOME/Projects/build/indi-3rdparty" \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="${INDI_WARN_FLAGS}" \
+            -DCMAKE_CXX_FLAGS="${INDI_WARN_FLAGS}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=OFF
           cmake --build "$HOME/Projects/build/indi-3rdparty" --parallel 4
           cmake --install "$HOME/Projects/build/indi-3rdparty"
@@ -148,8 +154,8 @@ jobs:
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           export CMAKE_PREFIX_PATH="/usr/local:${CMAKE_PREFIX_PATH:-}"
           export OpenCV_DIR="/usr/local/lib/cmake/opencv4"
-          export DEB_CFLAGS_MAINT_APPEND="${DEB_CFLAGS_MAINT_APPEND:-} -Wno-error"
-          export DEB_CXXFLAGS_MAINT_APPEND="${DEB_CXXFLAGS_MAINT_APPEND:-} -Wno-error"
+          export DEB_CFLAGS_MAINT_APPEND="${DEB_CFLAGS_MAINT_APPEND:-} -Wno-error -Wno-error=stringop-truncation -Wno-error=stringop-overread"
+          export DEB_CXXFLAGS_MAINT_APPEND="${DEB_CXXFLAGS_MAINT_APPEND:-} -Wno-error -Wno-error=stringop-truncation -Wno-error=stringop-overread"
           export DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)"
           dpkg-buildpackage -b -us -uc -a arm64
 
