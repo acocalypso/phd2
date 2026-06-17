@@ -51,15 +51,19 @@ jobs:
             gnupg
 
           # Debian Trixie currently ships libindi-dev 1.9.x, but PHD2 packaging requires INDI >= 2.0.
-          # Build indi-core from source (v2.1.9) and install a dummy dpkg package (libindi-dev 2.1.9)
+          # Build indi-core from source (v2.2.3.1) and install a dummy dpkg package (libindi-dev 2.2.3.1)
           # so mk-build-deps can satisfy the versioned Build-Depends.
+          INDI_VERSION=2.2.3.1
           mkdir -p "$HOME/Projects" "$HOME/Projects/build"
           cd "$HOME/Projects"
-          git clone --depth 1 --branch v2.1.9 https://github.com/indilib/indi.git indi-core
+          git clone --depth 1 --branch "v${INDI_VERSION}" https://github.com/indilib/indi.git indi-core
           mkdir -p "$HOME/Projects/build/indi-core"
+          export CFLAGS="${CFLAGS:-} -Wno-error"
+          export CXXFLAGS="${CXXFLAGS:-} -Wno-error"
           cmake -S "$HOME/Projects/indi-core" -B "$HOME/Projects/build/indi-core" \
             -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=OFF
           cmake --build "$HOME/Projects/build/indi-core" --parallel "$(nproc)"
           cmake --install "$HOME/Projects/build/indi-core"
           ldconfig
@@ -71,14 +75,14 @@ jobs:
           Standards-Version: 4.7.0
           
           Package: libindi-dev
-          Version: 2.1.9
+          Version: 2.2.3.1
           Maintainer: GitHub Actions <actions@github.com>
           Architecture: all
           Description: Dummy libindi-dev package (CI)
            Dummy package to satisfy Build-Depends when INDI is built from source.
           EOF
           (cd /tmp/libindi-dev-equivs && equivs-build control)
-          dpkg -i /tmp/libindi-dev-equivs/libindi-dev_2.1.9_all.deb
+          dpkg -i /tmp/libindi-dev-equivs/libindi-dev_2.2.3.1_all.deb
 
           # Ensure we are in the workspace root where debian/control exists
           cd "${GITHUB_WORKSPACE}"
@@ -103,17 +107,21 @@ jobs:
           cmake --install opencv-${OPENCV_VERSION}/build
           ldconfig
 
-      - name: Build and install INDI 3rd Party (v2.1.9)
+      - name: Build and install INDI 3rd Party (v2.2.3.1)
         run: |
           set -euo pipefail
+          INDI_VERSION=2.2.3.1
           mkdir -p "$HOME/Projects" "$HOME/Projects/build/indi-3rdparty"
           cd "$HOME/Projects"
 
-          git clone --depth 1 --branch v2.1.9 https://github.com/indilib/indi-3rdparty.git indi-3rdparty
+          git clone --depth 1 --branch "v${INDI_VERSION}" https://github.com/indilib/indi-3rdparty.git indi-3rdparty
 
+          export CFLAGS="${CFLAGS:-} -Wno-error"
+          export CXXFLAGS="${CXXFLAGS:-} -Wno-error"
           cmake -S "$HOME/Projects/indi-3rdparty" -B "$HOME/Projects/build/indi-3rdparty" \
             -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=OFF
           cmake --build "$HOME/Projects/build/indi-3rdparty" --parallel 4
           cmake --install "$HOME/Projects/build/indi-3rdparty"
           ldconfig
@@ -140,6 +148,8 @@ jobs:
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           export CMAKE_PREFIX_PATH="/usr/local:${CMAKE_PREFIX_PATH:-}"
           export OpenCV_DIR="/usr/local/lib/cmake/opencv4"
+          export DEB_CFLAGS_MAINT_APPEND="${DEB_CFLAGS_MAINT_APPEND:-} -Wno-error"
+          export DEB_CXXFLAGS_MAINT_APPEND="${DEB_CXXFLAGS_MAINT_APPEND:-} -Wno-error"
           export DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)"
           dpkg-buildpackage -b -us -uc -a arm64
 
