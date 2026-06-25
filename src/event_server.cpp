@@ -2215,17 +2215,30 @@ static void get_camera_bitdepth(JObj& response, const json_value *params)
         return;
     }
 
-    // Read from camera-specific profile setting (what the camera will use on next connect)
+    // When the camera is connected, report the actual hardware bit depth. The
+    // per-camera profile defaults below can disagree with the driver's own
+    // default (e.g. cam_touptek defaults the bpp key to 8 when unset, while this
+    // RPC historically defaulted it to 16). That mismatch makes a client believe
+    // 16-bit is active when the camera is really running at 8-bit, so trust the
+    // connected device over the profile default.
+    if (pCamera->Connected)
+    {
+        response << jrpc_result((int) pCamera->BitsPerPixel());
+        return;
+    }
+
+    // Disconnected: read the camera-specific profile setting (what the camera
+    // will use on next connect). Defaults mirror each driver's own default.
     int bitdepth = 16; // default
     wxString camName = pCamera->Name;
     if (camName.Contains("ToupTek") || camName.Contains("Altair"))
-        bitdepth = pConfig->Profile.GetInt("/camera/ToupTek/bpp", 16);
+        bitdepth = pConfig->Profile.GetInt("/camera/ToupTek/bpp", 8);
     else if (camName.Contains("Ogma"))
-        bitdepth = pConfig->Profile.GetInt("/camera/ogma/bpp", 16);
+        bitdepth = pConfig->Profile.GetInt("/camera/ogma/bpp", 8);
     else if (camName.Contains("ZWO"))
-        bitdepth = pConfig->Profile.GetInt("/camera/ZWO/bpp", 16);
+        bitdepth = pConfig->Profile.GetInt("/camera/ZWO/bpp", 8);
     else if (camName.Contains("PlayerOne"))
-        bitdepth = pConfig->Profile.GetInt("/camera/POA/bpp", 16);
+        bitdepth = pConfig->Profile.GetInt("/camera/POA/bpp", 8);
     else if (camName.Contains("SVB"))
         bitdepth = pConfig->Profile.GetInt("/camera/svb/bpp", 16);
     else if (camName.Contains("Moravian"))

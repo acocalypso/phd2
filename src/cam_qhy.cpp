@@ -602,6 +602,15 @@ bool Camera_QHY::Connect(const wxString& camId)
         return CamConnectFailed(_("Failed to initialize QHY SDK"));
     }
 
+    // Re-read the configured bit depth from the profile. It is also read in the
+    // constructor, but the camera object outlives a disconnect/reconnect, so a
+    // change made while disconnected (e.g. via the set_camera_bitdepth RPC, which
+    // only writes the profile) would otherwise not take effect until the object is
+    // recreated. Honour the profile setting on every connect; the 16-bit capability
+    // check below may still downgrade it.
+    m_bpp = pConfig->Profile.GetInt(CONFIG_PATH_QHY_BPP, DEFAULT_BPP);
+    Debug.Write(wxString::Format("QHY: connect: using bpp = %u\n", m_bpp));
+
     std::string qid;
 
     if (camId == DEFAULT_CAMERA_ID)

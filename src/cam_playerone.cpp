@@ -394,6 +394,15 @@ bool PlayerOneCamera::Connect(const wxString& camId)
         return CamConnectFailed(err);
     }
 
+    // Re-read the configured bit depth from the profile. It is also read in the
+    // constructor, but the camera object outlives a disconnect/reconnect, so a
+    // change made while disconnected (e.g. via the set_camera_bitdepth RPC, which
+    // only writes the profile) would otherwise not take effect until the object is
+    // recreated. Honour the profile setting on every connect.
+    int configuredBpp = pConfig->Profile.GetInt("/camera/POA/bpp", 8);
+    m_bpp = configuredBpp == 8 ? 8 : 16;
+    Debug.Write(wxString::Format("PlayerOne: connect: using bpp = %d\n", m_bpp));
+
     int selected = FindCamera(camId, &err);
     if (selected == -1)
     {

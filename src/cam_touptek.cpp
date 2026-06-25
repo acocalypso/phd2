@@ -314,6 +314,15 @@ bool CameraToupTek::Connect(const wxString& camIdArg)
         return CamConnectFailed(_("No ToupTek cameras detected"));
     }
 
+    // Re-read the configured bit depth from the profile. It is also read in the
+    // constructor, but the camera object outlives a disconnect/reconnect, so a
+    // change made while disconnected (e.g. via the set_camera_bitdepth RPC, which
+    // only writes the profile) would otherwise not take effect until the object is
+    // recreated. Honour the profile setting on every connect.
+    int configuredBpp = pConfig->Profile.GetInt("/camera/ToupTek/bpp", 8);
+    m_cam.m_bpp = configuredBpp == 8 ? 8 : 16;
+    Debug.Write(wxString::Format("TOUPTEK: connect: using bpp = %d\n", m_cam.m_bpp));
+
     wxString camId(camIdArg);
     if (camId == DEFAULT_CAMERA_ID)
         camId = ti[0].id;
