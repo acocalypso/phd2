@@ -606,6 +606,15 @@ bool MoravianCamera::Connect(const wxString& camId)
         return CamConnectFailed(err);
     }
 
+    // Re-read the configured bit depth from the profile. It is also read in the
+    // constructor, but the camera object outlives a disconnect/reconnect, so a
+    // change made while disconnected (e.g. via the set_camera_bitdepth RPC, which
+    // only writes the profile) would otherwise not take effect until the object is
+    // recreated. Honour the profile setting on every connect.
+    int configuredBpp = pConfig->Profile.GetInt("/camera/moravian/bpp", 16);
+    m_bpp = configuredBpp == 8 ? 8 : 16;
+    Debug.Write(wxString::Format("Moravian: connect: using bpp = %d\n", m_bpp));
+
     int drv_major = m_cam.IntParam(gipDriverMajor);
     int drv_minor = m_cam.IntParam(gipDriverMinor);
     int drv_build = m_cam.IntParam(gipDriverBuild);

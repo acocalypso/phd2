@@ -308,6 +308,15 @@ bool CameraOgma::Connect(const wxString& camIdArg)
 
     Debug.Write(wxString::Format("OGMA: connect: found %u cameras\n", numCameras));
 
+    // Re-read the configured bit depth from the profile. It is also read in the
+    // constructor, but the camera object outlives a disconnect/reconnect, so a
+    // change made while disconnected (e.g. via the set_camera_bitdepth RPC, which
+    // only writes the profile) would otherwise not take effect until the object is
+    // recreated. Honour the profile setting on every connect.
+    int configuredBpp = pConfig->Profile.GetInt("/camera/ogma/bpp", 8);
+    m_cam.m_bpp = configuredBpp == 8 ? 8 : 16;
+    Debug.Write(wxString::Format("OGMA: connect: using bpp = %d\n", m_cam.m_bpp));
+
     if (numCameras == 0)
     {
         return CamConnectFailed(_("No OGMA cameras detected"));
