@@ -2245,6 +2245,13 @@ bool GearDialog::ConnectAll(wxString *error)
 
     if (fail.IsEmpty())
     {
+        // The interactive path flushes config in ShowModal(); the server-mode
+        // ConnectAll() path bypasses it, so any profile updates made during connect
+        // (e.g. the device pixel size adopted in DoConnectCamera) would only live in
+        // memory and be lost on an unclean reboot. Persist them now so subsequent
+        // connects see the corrected values and don't re-fire the image-scale-change
+        // alert on every startup.
+        pConfig->Flush();
         return false;
     }
     else
