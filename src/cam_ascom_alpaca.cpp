@@ -659,6 +659,21 @@ class CameraAlpaca : public GuideCamera
     int m_gainMax;
     int m_curGain;
 
+    // Persistent transfer buffer for the raw ImageBytes payload, reserved once
+    // in Connect() and reused every Capture() -- mirrors cam_touptek.cpp's
+    // single Connect()-time malloc of m_cam.m_buffer instead of allocating a
+    // fresh multi-megabyte buffer per exposure for the life of the session.
+    std::string m_imageBuf;
+
+    // Every m_client call funnels through one CURL easy handle, which is not
+    // thread-safe for concurrent use. Capture() drives it from the guide
+    // WorkerThread while cooler/gain/temperature getters and pulse-guiding
+    // can be invoked concurrently from the GUI thread (PHD2's own status
+    // polling, or JSON-RPC requests handled by event_server.cpp), so every
+    // access is serialized through this lock -- mirrors cam_touptek.cpp's use
+    // of a wxMutex to guard state shared across threads.
+    mutable wxMutex m_clientLock;
+
 public:
     CameraAlpaca();
     ~CameraAlpaca();
@@ -743,6 +758,8 @@ bool CameraAlpaca::EnumCameras(wxArrayString& names, wxArrayString& ids)
 
 bool CameraAlpaca::Connect(const wxString& cameraId)
 {
+    wxMutexLocker lck(m_clientLock);
+
     wxString host = cameraId.BeforeFirst(':');
     wxString rest = cameraId.AfterFirst(':');
     long port = 0, devnum = 0;
@@ -807,6 +824,13 @@ bool CameraAlpaca::Connect(const wxString& cameraId)
     }
     m_maxSize.Set(xsize, ysize);
     m_swapAxes = false;
+
+    // Size the reusable transfer buffer for the largest frame this camera can
+    // return (worst case 4 bytes/pixel, in case a driver sends Int32/Single
+    // elements) so no capture ever needs to grow it.
+    m_imageBuf.clear();
+    m_imageBuf.shrink_to_fit();
+    m_imageBuf.reserve((size_t) xsize * (size_t) ysize * 4 + 64);
 
     double pixelSizeX = 0, pixelSizeY = 0;
     if (m_client->GetDouble("pixelsizex", &pixelSizeX, &err) || m_client->GetDouble("pixelsizey", &pixelSizeY, &err))
@@ -875,6 +899,8 @@ bool CameraAlpaca::Disconnect()
         return false;
     }
 
+    wxMutexLocker lck(m_clientLock);
+
     bool failed = false;
     if (m_client)
     {
@@ -889,6 +915,10 @@ bool CameraAlpaca::Disconnect()
 
     m_client.reset();
     Connected = false;
+
+    m_imageBuf.clear();
+    m_imageBuf.shrink_to_fit();
+
     return failed;
 }
 
@@ -904,6 +934,8 @@ bool CameraAlpaca::AbortExposure()
 {
     if (!m_client || !(m_canAbortExposure || m_canStopExposure))
         return false;
+
+    wxMutexLocker lck(m_clientLock);
 
     wxString err;
     bool failed = m_canAbortExposure ? m_client->Put("abortexposure", {}, &err) : m_client->Put("stopexposure", {}, &err);
@@ -941,7 +973,7 @@ bool CameraAlpaca::PrepareImageBuffer(usImage& img, bool is_subframe, const wxRe
         }
         if (img.Init(FrameSize))
         {
-            pFrame->Alert(_("Memory allocation error"));
+            DisconnectWithAlert(CAPT_FAIL_MEMORY);
             return true;
         }
         img.Clear();
@@ -952,7 +984,7 @@ bool CameraAlpaca::PrepareImageBuffer(usImage& img, bool is_subframe, const wxRe
         FrameSize.Set((int) width, (int) height);
         if (img.Init(FrameSize))
         {
-            pFrame->Alert(_("Memory allocation error"));
+            DisconnectWithAlert(CAPT_FAIL_MEMORY);
             return true;
         }
     }
@@ -1088,10 +1120,15 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
 
     if (binningChanged)
     {
-        if (m_client->PutValue("binx", "BinX", (int) HwBinning, &err) ||
-            m_client->PutValue("biny", "BinY", (int) HwBinning, &err))
+        bool putFailed;
         {
-            pFrame->Alert(wxString::Format(_("The Alpaca camera failed to set binning: %s"), err));
+            wxMutexLocker lck(m_clientLock);
+            putFailed = m_client->PutValue("binx", "BinX", (int) HwBinning, &err) ||
+                m_client->PutValue("biny", "BinY", (int) HwBinning, &err);
+        }
+        if (putFailed)
+        {
+            DisconnectWithAlert(wxString::Format(_("The Alpaca camera failed to set binning: %s"), err), RECONNECT);
             return true;
         }
         m_curBin = HwBinning;
@@ -1099,12 +1136,17 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
 
     if (roi != m_roi)
     {
-        if (m_client->PutValue("startx", "StartX", (int) roi.GetLeft(), &err) ||
-            m_client->PutValue("starty", "StartY", (int) roi.GetTop(), &err) ||
-            m_client->PutValue("numx", "NumX", (int) roi.GetWidth(), &err) ||
-            m_client->PutValue("numy", "NumY", (int) roi.GetHeight(), &err))
+        bool putFailed;
         {
-            pFrame->Alert(wxString::Format(_("The Alpaca camera failed to set the ROI: %s"), err));
+            wxMutexLocker lck(m_clientLock);
+            putFailed = m_client->PutValue("startx", "StartX", (int) roi.GetLeft(), &err) ||
+                m_client->PutValue("starty", "StartY", (int) roi.GetTop(), &err) ||
+                m_client->PutValue("numx", "NumX", (int) roi.GetWidth(), &err) ||
+                m_client->PutValue("numy", "NumY", (int) roi.GetHeight(), &err);
+        }
+        if (putFailed)
+        {
+            DisconnectWithAlert(wxString::Format(_("The Alpaca camera failed to set the ROI: %s"), err), RECONNECT);
             return true;
         }
         m_roi = roi;
@@ -1112,6 +1154,7 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
 
     if (HasGainControl)
     {
+        wxMutexLocker lck(m_clientLock);
         int nativeGain = m_gainMin + (m_gainMax - m_gainMin) * wxClip(captureParams.gain, 0, 100) / 100;
         if (nativeGain != m_curGain)
         {
@@ -1128,10 +1171,15 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
         { "Duration", wxString::Format("%.3f", (double) duration / 1000.0) },
         { "Light", takeDark ? "false" : "true" },
     };
-    if (m_client->Put("startexposure", startParams, &err))
+    bool startFailed;
+    {
+        wxMutexLocker lck(m_clientLock);
+        startFailed = m_client->Put("startexposure", startParams, &err);
+    }
+    if (startFailed)
     {
         Debug.AddLine("Alpaca StartExposure failed: " + err);
-        pFrame->Alert(wxString::Format(_("Alpaca error -- cannot start exposure: %s"), err));
+        DisconnectWithAlert(wxString::Format(_("Alpaca error -- cannot start exposure: %s"), err), RECONNECT);
         return true;
     }
 
@@ -1150,10 +1198,15 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
     {
         wxMilliSleep(100);
         bool ready = false;
-        if (m_client->GetBool("imageready", &ready, &err))
+        bool pollFailed;
+        {
+            wxMutexLocker lck(m_clientLock);
+            pollFailed = m_client->GetBool("imageready", &ready, &err);
+        }
+        if (pollFailed)
         {
             Debug.AddLine("Alpaca ImageReady poll failed: " + err);
-            pFrame->Alert(wxString::Format(_("Exception thrown polling Alpaca camera: %s"), err));
+            DisconnectWithAlert(wxString::Format(_("Exception thrown polling Alpaca camera: %s"), err), RECONNECT);
             return true;
         }
         if (ready)
@@ -1167,17 +1220,21 @@ bool CameraAlpaca::Capture(usImage& img, const CaptureParams& captureParams)
         }
     }
 
-    std::string imageBytes;
-    if (m_client->GetImageBytes(&imageBytes, &err))
+    bool fetchFailed;
+    {
+        wxMutexLocker lck(m_clientLock);
+        fetchFailed = m_client->GetImageBytes(&m_imageBuf, &err);
+    }
+    if (fetchFailed)
     {
         Debug.AddLine("Alpaca ImageArray fetch failed: " + err);
-        pFrame->Alert(wxString::Format(_("Error reading image: %s"), err));
+        DisconnectWithAlert(wxString::Format(_("Error reading image: %s"), err), RECONNECT);
         return true;
     }
 
-    if (DecodeImageBytes(imageBytes, img, takeSubframe, roi))
+    if (DecodeImageBytes(m_imageBuf, img, takeSubframe, roi))
     {
-        pFrame->Alert(_("Error decoding Alpaca image data"));
+        DisconnectWithAlert(_("Error decoding Alpaca image data"), RECONNECT);
         return true;
     }
 
@@ -1215,10 +1272,13 @@ bool CameraAlpaca::ST4PulseGuideScope(int direction, int duration)
 
     MountWatchdog watchdog(duration, 5000);
 
-    if (m_client->Put("pulseguide", params, &err))
     {
-        Debug.AddLine("Alpaca PulseGuide failed: " + err);
-        return true;
+        wxMutexLocker lck(m_clientLock);
+        if (m_client->Put("pulseguide", params, &err))
+        {
+            Debug.AddLine("Alpaca PulseGuide failed: " + err);
+            return true;
+        }
     }
 
     if (watchdog.Time() < duration) // likely returned right away, not after the move -- poll
@@ -1226,7 +1286,12 @@ bool CameraAlpaca::ST4PulseGuideScope(int direction, int duration)
         while (true)
         {
             bool moving = false;
-            if (m_client->GetBool("ispulseguiding", &moving, &err))
+            bool pollFailed;
+            {
+                wxMutexLocker lck(m_clientLock);
+                pollFailed = m_client->GetBool("ispulseguiding", &moving, &err);
+            }
+            if (pollFailed)
             {
                 Debug.AddLine("Alpaca IsPulseGuiding poll failed: " + err);
                 return true;
@@ -1258,6 +1323,8 @@ bool CameraAlpaca::SetCoolerOn(bool on)
     if (!Connected)
         return true;
 
+    wxMutexLocker lck(m_clientLock);
+
     wxString err;
     if (m_client->PutValue("cooleron", "CoolerOn", on, &err))
     {
@@ -1280,6 +1347,8 @@ bool CameraAlpaca::SetCoolerSetpoint(double temperature)
     if (!Connected)
         return true;
 
+    wxMutexLocker lck(m_clientLock);
+
     wxString err;
     if (m_client->PutValue("setccdtemperature", "SetCCDTemperature", temperature, &err))
     {
@@ -1294,6 +1363,8 @@ bool CameraAlpaca::GetCoolerStatus(bool *on, double *setpoint, double *power, do
 {
     if (!HasCooler || !m_client)
         return true;
+
+    wxMutexLocker lck(m_clientLock);
 
     wxString err;
 
@@ -1331,6 +1402,8 @@ bool CameraAlpaca::GetSensorTemperature(double *temperature)
     if (!m_client)
         return true;
 
+    wxMutexLocker lck(m_clientLock);
+
     wxString err;
     if (m_client->GetDouble("ccdtemperature", temperature, &err))
     {
@@ -1358,6 +1431,8 @@ bool CameraAlpaca::GetHardwareGain(int *gain) const
 {
     if (!HasGainControl || !m_client)
         return false;
+
+    wxMutexLocker lck(m_clientLock);
 
     wxString err;
     int nativeGain;
