@@ -43,6 +43,7 @@
 // Windows cameras
 
 #  define ASCOM_CAMERA
+#  define ALPACA_CAMERA
 #  define INDI_CAMERA
 #  define OPENCV_CAMERA
 #  define SIMULATOR
@@ -124,6 +125,7 @@
 #  ifdef HAVE_FIREWIRE_CAMERA
 #   define FIREWIRE_CAMERA
 #  endif
+#  define ALPACA_CAMERA
 #  define INDI_CAMERA
 #  ifdef HAVE_KWIQGUIDER_CAMERA
 #   define KWIQGUIDER_CAMERA
@@ -161,6 +163,7 @@
 
 #  define SIMULATOR
 #  define OPENCV_CAMERA
+#  define ALPACA_CAMERA
 #  define CAM_QHY5
 #  ifdef HAVE_OGMA_CAMERA
 #   define OGMA_CAMERA

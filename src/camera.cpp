@@ -181,6 +181,10 @@ wxSize UNDEFINED_FRAME_SIZE = wxSize(0, 0);
 # include "cam_ascom.h"
 #endif
 
+#if defined(ALPACA_CAMERA)
+# include "cam_ascom_alpaca.h"
+#endif
+
 #if defined(INDI_CAMERA)
 # include "cam_indi.h"
 #endif
@@ -256,6 +260,9 @@ wxArrayString GuideCamera::GuideCameraList()
     wxArrayString ascomCameras = ASCOMCameraFactory::EnumAscomCameras();
     for (unsigned int i = 0; i < ascomCameras.Count(); i++)
         CameraList.Add(ascomCameras[i]);
+#endif
+#if defined(ALPACA_CAMERA)
+    CameraList.Add(_T("Alpaca Camera"));
 #endif
 #if defined(ATIK16)
     CameraList.Add(_T("Atik 16 series, mono"));
@@ -408,6 +415,12 @@ GuideCamera *GuideCamera::Factory(const wxString& choice)
         else if (choice.Contains(_T("ASCOM")))
         {
             pReturn = ASCOMCameraFactory::MakeASCOMCamera(choice);
+        }
+#endif
+#if defined(ALPACA_CAMERA)
+        else if (choice.Contains(_T("Alpaca")))
+        {
+            pReturn = ASCOMAlpacaCameraFactory::MakeAlpacaCamera();
         }
 #endif
 #if defined(INDI_CAMERA)

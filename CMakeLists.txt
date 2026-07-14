@@ -171,6 +171,8 @@ set(cam_SRC
   ${phd_src_dir}/cam_altair.h
   ${phd_src_dir}/cam_ascom.cpp
   ${phd_src_dir}/cam_ascom.h
+  ${phd_src_dir}/cam_ascom_alpaca.cpp
+  ${phd_src_dir}/cam_ascom_alpaca.h
   ${phd_src_dir}/cam_atik16.cpp
   ${phd_src_dir}/cam_atik16.h
   ${phd_src_dir}/cam_firewire.h
