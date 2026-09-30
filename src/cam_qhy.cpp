@@ -572,8 +572,14 @@ bool Camera_QHY::EnumCameras(wxArrayString& names, wxArrayString& ids)
         char camid[32] = "";
         GetQHYCCDId(i, camid);
         bool st4 = false;
-        qhyccd_handle *h = OpenQHYCCD(camid);
-        if (h)
+        // Do not open/close the camera PHD2 is connected to: OpenQHYCCD returns the live
+        // handle and CloseQHYCCD would reset the camera underneath it (issue #190)
+        const Camera_QHY *active = dynamic_cast<const Camera_QHY *>(pCamera);
+        if (active && active->Connected && active->Name == camid)
+        {
+            Debug.Write(wxString::Format("QHY cam [%d] %s avail In use (connected)\n", i, camid));
+        }
+        else if (qhyccd_handle *h = OpenQHYCCD(camid))
         {
             uint32_t ret = IsQHYCCDControlAvailable(h, CONTROL_ST4PORT);
             if (ret == QHYCCD_SUCCESS)
